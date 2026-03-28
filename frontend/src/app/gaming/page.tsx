@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Play, Clock, Zap, Loader2, StopCircle } from 'lucide-react';
+import { API_BASE_URL } from '@/app/lib/api'; // Adjust the import path if necessary
 
 interface InstanceRecord {
   id: number;

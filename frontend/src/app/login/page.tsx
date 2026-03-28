@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { API_BASE_URL } from '@/app/lib/api'; // Adjust the import path if necessary
 
 export default function LoginPage() {
   return (

@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '@/app/lib/api'; // Adjust the import path if necessary
 
 interface InstanceRecord {
   id: number;

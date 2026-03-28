@@ -1,25 +1,14 @@
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 
-# Enterprise-grade PostgreSQL deployment handling high concurrency load for 6:00 PM rushes
+# Read from environment variable, default to local if not found
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://myuser:mypassword@localhost:5432/cga_db"
+    "postgresql://postgres:password@localhost:5432/cloudgaming" # Your local fallback
 )
 
-# Robust connection pooling
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, pool_size=20, max_overflow=50
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Render's PostgreSQL URLs start with postgres:// but SQLAlchemy requires postgresql://
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-Base = declarative_base()
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
