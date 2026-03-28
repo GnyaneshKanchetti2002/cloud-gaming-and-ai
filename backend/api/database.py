@@ -1,14 +1,23 @@
 import os
 from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-# Read from environment variable, default to local if not found
+# 1. Fetch the Database URL from the environment, with a local fallback
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://postgres:password@localhost:5432/cloudgaming" # Your local fallback
+    "postgresql://postgres:password@localhost:5432/cloudgaming" 
 )
 
-# Render's PostgreSQL URLs start with postgres:// but SQLAlchemy requires postgresql://
-if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+# 2. Fix Render's URL format (SQLAlchemy requires 'postgresql://')
+if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# 3. Create the SQLAlchemy engine
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
+# 4. Create a session factory
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# 5. Create the Base class for your database models
+Base = declarative_base()
