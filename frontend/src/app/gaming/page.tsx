@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Play, Clock, Zap, Loader2, StopCircle } from 'lucide-react';
-import { API_BASE_URL } from '@/app/lib/api'; // Adjust the import path if necessary
 
 interface InstanceRecord {
   id: number;
@@ -17,10 +16,22 @@ export default function GamingDashboard() {
   const [user, setUser] = useState<any>(null);
   const router = useRouter();
 
+  // --- THE FIX: Helper to grab the token for all API requests ---
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}` // This proves to FastAPI who you are
+    };
+  };
+
   const fetchInstances = async (userId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${baseUrl}/api/proxmox/instances/${userId}`, { credentials: 'include' });
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
+      const res = await fetch(`${baseUrl}/api/proxmox/instances/${userId}`, { 
+        headers: getAuthHeaders(), // <-- Applied here
+        credentials: 'include' 
+      });
       if (res.ok) {
         const data = await res.json();
         setInstances(data);
@@ -32,13 +43,28 @@ export default function GamingDashboard() {
 
   useEffect(() => {
     const authenticate = async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
+      const token = localStorage.getItem('token');
+      
+      // If there is no token in storage, kick them out immediately
+      if (!token) {
+          router.push('/login');
+          return;
+      }
+
       try {
-        const res = await fetch(`${baseUrl}/api/auth/me`, { credentials: 'include' });
+        const res = await fetch(`${baseUrl}/api/auth/me`, { 
+          headers: getAuthHeaders(), // <-- Applied here
+          credentials: 'include' 
+        });
+        
         if (!res.ok) {
+          // Token is invalid or expired. Destroy it and kick them out.
+          localStorage.removeItem('token');
           router.push('/login');
           return;
         }
+        
         const activeUser = await res.json();
         setUser(activeUser);
         fetchInstances(activeUser.id);
@@ -46,6 +72,7 @@ export default function GamingDashboard() {
         router.push('/login');
       }
     };
+    
     authenticate();
 
     const interval = setInterval(() => {
@@ -57,10 +84,10 @@ export default function GamingDashboard() {
   const handleLaunch = async (gameTitle: string) => {
     setLaunchingGame(gameTitle);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
       await fetch(`${baseUrl}/api/proxmox/provision`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(), // <-- Applied here
         credentials: "include",
         body: JSON.stringify({
           node_name: `Gamer-Node-${Math.floor(Math.random() * 1000)}`,
@@ -79,9 +106,10 @@ export default function GamingDashboard() {
 
   const handleKill = async (instanceId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
       await fetch(`${baseUrl}/api/proxmox/kill/${instanceId}`, {
         method: "DELETE",
+        headers: getAuthHeaders(), // <-- Applied here
         credentials: "include"
       });
       if (user?.id) fetchInstances(user.id);
@@ -96,7 +124,7 @@ export default function GamingDashboard() {
     <div className="max-w-7xl mx-auto space-y-12 pb-24">
       
       {/* Top Welcome & Digital Wallet */}
-      <div className="flex flex-col xl:flex-row gap-8 items-start">
+      <div className="flex flex-col xl:flex-row gap-8 items-start mt-12">
         <div className="flex-1 space-y-2">
           <h1 className="text-4xl font-black italic tracking-wide text-white drop-shadow-md">
             WELCOME BACK <span className="text-fuchsia-400">PLAYER_ONE</span>
@@ -133,7 +161,6 @@ export default function GamingDashboard() {
       {/* Hero Game (Active Session Tracker) */}
       <div className="relative h-[60vh] min-h-[400px] max-h-[550px] rounded-[2rem] overflow-hidden group cursor-pointer border border-zinc-800/80 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)]">
         
-        {/* Placeholder for Cyberpunk cover - Dark abstract backplate */}
         <div className="absolute inset-0 bg-zinc-950">
           <div className="w-full h-full bg-[linear-gradient(45deg,#000_25%,transparent_25%),linear-gradient(-45deg,#000_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#000_75%),linear-gradient(-45deg,transparent_75%,#000_75%)] bg-[size:3px_3px] opacity-20 pointer-events-none mix-blend-overlay z-10" />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-10" />
@@ -210,7 +237,6 @@ export default function GamingDashboard() {
                 className={`absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-700 ease-out z-0`}
                 style={{ backgroundImage: `url(${game.img})` }} 
               />
-              {/* Optional Color Tint Overlay */}
               <div className={`absolute inset-0 bg-gradient-to-br ${i%2 === 0 ? 'from-fuchsia-600/20 to-blue-600/10' : 'from-rose-600/20 to-orange-600/10'} mix-blend-overlay z-0`} />
               
               <div className="absolute bottom-0 left-0 p-5 z-20 w-full transform translate-y-6 group-hover:translate-y-0 transition-transform duration-500 ease-out">
