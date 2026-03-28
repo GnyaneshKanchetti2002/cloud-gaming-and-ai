@@ -1,14 +1,34 @@
+"use client";
+
 import React from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Cpu, Shield, Zap } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Shield, Zap } from 'lucide-react';
 
 export default function LandingPage() {
+  const router = useRouter();
+
+  // The Gatekeeper Function
+  const handleProtectedNavigation = (path: string) => {
+    // We check if a 'token' exists in the browser's storage
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+    if (token) {
+      // If logged in, go to the requested page
+      router.push(path);
+    } else {
+      // If not logged in, force them to the login page
+      router.push('/login');
+    }
+  };
+
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-950 overflow-hidden">
       
-      {/* B2B Enterprise Section */}
-      <Link href="/enterprise" className="group relative w-full md:w-1/2 h-1/2 md:h-full flex flex-col justify-center items-center text-center p-8 md:p-12 overflow-hidden bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 transition-all duration-700 hover:w-full md:hover:w-[60%] cursor-pointer z-10">
-        
+      {/* B2B Enterprise Section - Converted to a div with onClick */}
+      <div 
+        onClick={() => handleProtectedNavigation('/enterprise')} 
+        className="group relative w-full md:w-1/2 h-1/2 md:h-full flex flex-col justify-center items-center text-center p-8 md:p-12 overflow-hidden bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 transition-all duration-700 hover:w-full md:hover:w-[60%] cursor-pointer z-10"
+      >
         {/* Background Grid & Particles */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[100px] group-hover:bg-blue-500/30 transition-all duration-700" />
@@ -31,11 +51,13 @@ export default function LandingPage() {
              </span>
           </div>
         </div>
-      </Link>
+      </div>
 
-      {/* B2C Gaming Section */}
-      <Link href="/gaming" className="group relative w-full md:w-1/2 h-1/2 md:h-full flex flex-col justify-center items-center text-center p-8 md:p-12 overflow-hidden bg-zinc-950 transition-all duration-700 hover:w-full md:hover:w-[60%] cursor-pointer z-10">
-        
+      {/* B2C Gaming Section - Converted to a div with onClick */}
+      <div 
+        onClick={() => handleProtectedNavigation('/gaming')} 
+        className="group relative w-full md:w-1/2 h-1/2 md:h-full flex flex-col justify-center items-center text-center p-8 md:p-12 overflow-hidden bg-zinc-950 transition-all duration-700 hover:w-full md:hover:w-[60%] cursor-pointer z-10"
+      >
         {/* Background Patterns */}
         <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(217,70,239,0.05)_50%,transparent_75%,transparent_100%)] bg-[length:250px_250px] animate-[slide_20s_linear_infinite]" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-fuchsia-600/20 rounded-full blur-[100px] group-hover:bg-fuchsia-600/30 transition-all duration-700 mix-blend-screen" />
@@ -58,7 +80,7 @@ export default function LandingPage() {
              </span>
           </div>
         </div>
-      </Link>
+      </div>
       
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes slide {
