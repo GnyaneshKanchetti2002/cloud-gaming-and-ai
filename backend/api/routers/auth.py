@@ -7,11 +7,15 @@ from .. import models, schemas
 from ..auth import create_access_token, get_current_user, redis_client
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
+from fastapi.responses import RedirectResponse
 
 router = APIRouter()
 
 config = Config(environ=os.environ)
 oauth = OAuth(config)
+
+# Get the frontend URL dynamically, fallback to Vercel for production
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app")
 
 oauth.register(
     name='discord',
@@ -101,20 +105,20 @@ def process_sso_login(db: Session, response: Response, email: str, provider: str
         db.add(wallet)
         db.commit()
 
+    # Generate the authentication token
     jwt_token = create_access_token(data={"sub": str(user.id), "role": user.role})
     
-    dashboard_route = "http://localhost:3000/gaming" if user.role == models.UserRole.B2C_GAMER else "http://localhost:3000/enterprise"
-    from fastapi.responses import RedirectResponse
-    redirect_response = RedirectResponse(url=dashboard_route, status_code=302)
+    # IMPORTANT: Redirect to Vercel and attach the token in the URL so the frontend can catch it
+    redirect_url = f"{FRONTEND_URL}/login?token={jwt_token}"
+    redirect_response = RedirectResponse(url=redirect_url, status_code=302)
     
-    # Send the user an HttpOnly cookie explicitly disabling JS access.
-    # The domain is set to localhost securely. In Production this sets on the vercel domain.
+    # Set the cookie with proper cross-origin settings for cloud deployment
     redirect_response.set_cookie(
         key="access_token",
         value=jwt_token,
         httponly=True,
-        secure=False, # Set to True in HTTPS Production
-        samesite="lax",
+        secure=True,         # Required for cross-domain cookies in production
+        samesite="none",     # Allows the cookie to be sent from Render to Vercel
         max_age=86400,
         path="/"
     )
@@ -130,5 +134,13 @@ def logout(request: Request, response: Response):
     token = request.cookies.get("access_token")
     if token:
         redis_client.setex(f"blacklist_jwt:{token}", 86400, "revoked")
-    response.delete_cookie("access_token", httponly=True, samesite="lax", path="/")
+    
+    # Clear the cookie using the same cross-origin settings
+    response.delete_cookie(
+        "access_token", 
+        httponly=True, 
+        secure=True, 
+        samesite="none", 
+        path="/"
+    )
     return {"status": "Enterprise sessions forcefully terminated."}
