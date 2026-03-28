@@ -1,7 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_BASE_URL } from '@/app/lib/api'; // Adjust the import path if necessary
 
 interface InstanceRecord {
   id: number;
@@ -21,10 +20,22 @@ export default function EnterpriseDashboard() {
   const [user, setUser] = useState<any>(null);
   const router = useRouter();
 
+  // --- THE FIX: Helper to grab the token for all API requests ---
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}` // This proves to FastAPI who you are
+    };
+  };
+
   const fetchInstances = async (userId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${baseUrl}/api/proxmox/instances/${userId}`, { credentials: 'include' });
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
+      const res = await fetch(`${baseUrl}/api/proxmox/instances/${userId}`, { 
+        headers: getAuthHeaders(), // <-- Secure headers applied
+        credentials: 'include' 
+      });
       if (res.ok) {
         const data = await res.json();
         setInstances(data);
@@ -38,13 +49,28 @@ export default function EnterpriseDashboard() {
 
   useEffect(() => {
     const authenticate = async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
+      const token = localStorage.getItem('token');
+      
+      // If there is no token in storage, kick them out immediately
+      if (!token) {
+          router.push('/login');
+          return;
+      }
+
       try {
-        const res = await fetch(`${baseUrl}/api/auth/me`, { credentials: 'include' });
+        const res = await fetch(`${baseUrl}/api/auth/me`, { 
+          headers: getAuthHeaders(), // <-- Secure headers applied
+          credentials: 'include' 
+        });
+        
         if (!res.ok) {
+          // Token is invalid or expired. Destroy it and kick them out.
+          localStorage.removeItem('token');
           router.push('/login');
           return;
         }
+        
         const activeUser = await res.json();
         setUser(activeUser);
         fetchInstances(activeUser.id);
@@ -54,7 +80,7 @@ export default function EnterpriseDashboard() {
     };
     authenticate();
     
-    // Poll hypervisor instances every 5 seconds (only if user is fetched, handled inside component logic normally but simplistic here)
+    // Poll hypervisor instances every 5 seconds
     const interval = setInterval(() => {
       if (user?.id) fetchInstances(user.id);
     }, 5000);
@@ -64,10 +90,10 @@ export default function EnterpriseDashboard() {
   const handleProvision = async () => {
     setIsProvisioning(true);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
       await fetch(`${baseUrl}/api/proxmox/provision`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(), // <-- Secure headers applied
         credentials: "include",
         body: JSON.stringify({
           node_name: `AI-Accel-Node-${Math.floor(Math.random() * 1000)}`,
@@ -86,9 +112,10 @@ export default function EnterpriseDashboard() {
 
   const handleKill = async (instanceId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
       await fetch(`${baseUrl}/api/proxmox/kill/${instanceId}`, {
         method: "DELETE",
+        headers: getAuthHeaders(), // <-- Secure headers applied
         credentials: "include"
       });
       if (user?.id) fetchInstances(user.id);
@@ -101,7 +128,7 @@ export default function EnterpriseDashboard() {
   const totalVram = instances.reduce((acc, curr) => acc + curr.vram_allocation, 0);
 
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-8 max-w-6xl mx-auto pt-12">
       
       {/* Top Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
