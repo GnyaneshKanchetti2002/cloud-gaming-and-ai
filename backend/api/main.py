@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware  # <--- 1. ADDED IMPORT
 import os
 
 # Import your routers (adjust these if your file names are different)
@@ -7,8 +8,18 @@ from api.routers import auth, users, payments, proxmox
 
 app = FastAPI()
 
+# --- Session Configuration (ADDED FOR OAUTH) ---
+# Authlib requires a session to temporarily store the OAuth state during login
+# In Render, you should add a 'SECRET_KEY' environment variable with a long random string.
+SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-session-key-change-this-later")
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SECRET_KEY,
+    max_age=3600  # 1 hour session lifetime
+)
+
 # --- CORS Configuration ---
-# Add your future Vercel URL here once you have it
 origins = [
     "http://localhost:3000", # Local Next.js
     os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app") # Production Next.js
