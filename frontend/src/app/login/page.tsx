@@ -1,28 +1,29 @@
 "use client";
 
-import React, { useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import React, { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
-// 1. Move the logic and UI into a separate component
-function LoginTerminal() {
+export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Use the live Render URL in production, fallback to local for dev
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
 
   useEffect(() => {
-    // CATCH THE TOKEN: After login, Render redirects back here with ?token=...
-    const token = searchParams.get('token');
+    // ONLY run this in the browser to completely bypass Vercel build errors
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
 
-    if (token) {
-      // SAVE THE TOKEN: Store it so the Landing Page knows we are logged in
-      localStorage.setItem('token', token);
-      
-      // REDIRECT: Send the user to the gaming dashboard
-      router.push('/gaming');
+      if (token) {
+        // SAVE THE TOKEN: Store it so the Landing Page knows we are logged in
+        localStorage.setItem('token', token);
+        
+        // REDIRECT: Send the user to the gaming dashboard
+        router.push('/gaming');
+      }
     }
-  }, [searchParams, router]);
+  }, [router]);
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-black overflow-hidden font-sans">
@@ -68,18 +69,5 @@ function LoginTerminal() {
           }
         `}} />
     </div>
-  );
-}
-
-// 2. Wrap the component in Suspense for the default export
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <div className="h-screen w-full bg-black flex items-center justify-center text-zinc-500 font-mono tracking-widest animate-pulse">
-        INITIALIZING SECURE TERMINAL...
-      </div>
-    }>
-      <LoginTerminal />
-    </Suspense>
   );
 }
