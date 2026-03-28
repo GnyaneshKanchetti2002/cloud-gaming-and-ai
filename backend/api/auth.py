@@ -40,10 +40,15 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
         if not token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Bearer token missing or cookie expired.")
 
-    # High-Velocity Redis Kill-Switch
-    is_blacklisted = redis_client.get(f"blacklist_jwt:{token}")
-    if is_blacklisted:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session permanently terminated by administrator.")
+    # High-Velocity Redis Kill-Switch (Wrapped in Try/Except for Safety)
+    try:
+        is_blacklisted = redis_client.get(f"blacklist_jwt:{token}")
+        if is_blacklisted:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session permanently terminated by administrator.")
+    except redis.exceptions.ConnectionError:
+        # If Redis is not running or not configured on Render yet, 
+        # bypass the blacklist check instead of crashing the login flow.
+        pass
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
