@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
+import models, schemas
 from ..database import get_db
 from .. import models, schemas
 from ..auth import get_admin_user, get_current_user, redis_client
-from ..tasks import destroy_node_background
+# FIX: Updated name to match the new task logic in tasks.py
+from ..tasks import destroy_node_logic 
 
 router = APIRouter()
 
@@ -17,7 +19,7 @@ class WalletUpdateRequest(BaseModel):
     hours_added: float
     reason: str
 
-# --- New Endpoint: The Identity Sorter ---
+# --- Identity Sorter ---
 @router.get("/me", response_model=schemas.UserResponse)
 def get_my_profile(
     current_user: models.User = Depends(get_current_user)
@@ -30,7 +32,7 @@ def get_my_profile(
 
 # --- Admin Endpoints ---
 
-@router.get("/", response_model=List[dict]) # You can also create a specific ListUser schema
+@router.get("/", response_model=List[dict])
 def list_users(
     skip: int = 0, 
     limit: int = 50, 
@@ -113,7 +115,7 @@ def ban_user(
     user.is_banned = True
     db.commit()
     
-    # Instantly vaporize ghost streams
+    # Instantly find ghost streams
     active_instances = db.query(models.Instance).filter(
         models.Instance.user_id == user.id,
         models.Instance.status.in_([
@@ -124,8 +126,10 @@ def ban_user(
     ).all()
     
     for instance in active_instances:
+        # Mark as destroying in DB
         instance.status = models.InstanceStatus.DESTROYING
-        background_tasks.add_task(destroy_node_background, instance.id)
+        # FIX: Trigger the correctly named background task
+        background_tasks.add_task(destroy_node_logic, instance.id)
         
     db.commit()
     
@@ -134,6 +138,7 @@ def ban_user(
 @router.delete("/{user_id}")
 def delete_user(
     user_id: int,
+    background_tasks: BackgroundTasks, # Added background_tasks for cleanup
     db: Session = Depends(get_db),
     admin: models.User = Depends(get_admin_user)
 ):
@@ -144,7 +149,7 @@ def delete_user(
     # Soft delete
     user.is_active = False
     
-    # Safely clear their active streams if any
+    # Safely clear their active streams via background task
     active_instances = db.query(models.Instance).filter(
         models.Instance.user_id == user.id,
         models.Instance.status.in_([
@@ -156,6 +161,8 @@ def delete_user(
     
     for instance in active_instances:
         instance.status = models.InstanceStatus.DESTROYING
+        # FIX: Ensure instances are actually purged from Proxmox logic
+        background_tasks.add_task(destroy_node_logic, instance.id)
     
     db.commit()
     return {"status": "success", "message": "Identity softly purged from operational datastore"}
