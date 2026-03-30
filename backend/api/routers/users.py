@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
-import models, schemas
+
+# The absolute import that caused the crash has been permanently removed.
 from ..database import get_db
 from .. import models, schemas
 from ..auth import get_admin_user, get_current_user, redis_client
-# FIX: Updated name to match the new task logic in tasks.py
 from ..tasks import destroy_node_logic 
 
 router = APIRouter()
@@ -128,7 +128,7 @@ def ban_user(
     for instance in active_instances:
         # Mark as destroying in DB
         instance.status = models.InstanceStatus.DESTROYING
-        # FIX: Trigger the correctly named background task
+        # Trigger the correctly named background task
         background_tasks.add_task(destroy_node_logic, instance.id)
         
     db.commit()
@@ -138,7 +138,7 @@ def ban_user(
 @router.delete("/{user_id}")
 def delete_user(
     user_id: int,
-    background_tasks: BackgroundTasks, # Added background_tasks for cleanup
+    background_tasks: BackgroundTasks, 
     db: Session = Depends(get_db),
     admin: models.User = Depends(get_admin_user)
 ):
@@ -161,7 +161,7 @@ def delete_user(
     
     for instance in active_instances:
         instance.status = models.InstanceStatus.DESTROYING
-        # FIX: Ensure instances are actually purged from Proxmox logic
+        # Ensure instances are actually purged from Proxmox logic
         background_tasks.add_task(destroy_node_logic, instance.id)
     
     db.commit()
