@@ -113,6 +113,13 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
         db.commit()
         db.refresh(user)
 
+    # --- VIP PASS: Auto-promote specific user to Admin ---
+    if email == "kan.gnyanesh@gmail.com" and not user.is_admin:
+        user.is_admin = True
+        db.commit()
+        db.refresh(user)
+    # -----------------------------------------------------
+
     jwt_token = create_access_token(data={"sub": str(user.id), "role": user.role})
     
     # Send user to the Frontend "Sorting Hat"
@@ -141,8 +148,13 @@ def get_me(current_user: models.User = Depends(get_current_user)):
 def logout(request: Request, response: Response):
     token = request.cookies.get("access_token")
     if token:
-        redis_client.setex(f"blacklist_jwt:{token}", 86400, "revoked")
-    
+        # Safety wrapper in case Redis is completely disabled on free tier
+        try:
+            if redis_client:
+                redis_client.setex(f"blacklist_jwt:{token}", 86400, "revoked")
+        except Exception:
+            pass 
+            
     IS_PROD = os.getenv("RENDER", "false").lower() == "true"
     response.delete_cookie(
         "access_token",
