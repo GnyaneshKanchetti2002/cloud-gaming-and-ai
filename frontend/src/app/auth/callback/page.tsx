@@ -26,11 +26,12 @@ function AuthHandler() {
       // 1. Save to LocalStorage for API calls
       localStorage.setItem('token', token);
       
-      // 2. THE FIX: Save to First-Party Cookie for Next.js Middleware!
+      // 2. Save to First-Party Cookie for Next.js Middleware
       // This allows Vercel route guards to instantly recognize the session
       document.cookie = `access_token=${token}; path=/; max-age=86400; SameSite=Lax`;
 
       try {
+        // EXACT FETCH FIX: Using exactly /auth/me so it doesn't double up the /api prefix
         const response = await fetch(`${API_BASE_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
           credentials: "include" 
@@ -77,7 +78,8 @@ function AuthHandler() {
   );
 }
 
-export default function DiscordCallback() {
+// Renamed slightly to reflect it handles ALL SSO callbacks (Discord & Azure)
+export default function SSOCallback() {
   return (
     <Suspense fallback={
       <div className="flex h-screen w-full flex-col items-center justify-center bg-slate-950">
