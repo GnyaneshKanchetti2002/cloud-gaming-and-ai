@@ -37,7 +37,8 @@ oauth.register(
 )
 
 def generate_moonlight_pin():
-    return random.randint(1000, 9999)
+    # Return as string to preserve leading zeros
+    return str(random.randint(1000, 9999))
 
 def generate_ssh_keys():
     return f"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI{os.urandom(24).hex()} b2b_admin@cga_platform"
@@ -62,9 +63,10 @@ async def callback_discord(request: Request, response: Response, db: Session = D
         raise HTTPException(status_code=400, detail="Discord authentication rejected.")
 
     email = user_info.get("email")
+    username = user_info.get("username") # Capture Discord username
     discord_id = str(user_info.get("id"))
     
-    return process_sso_login(db, response, email, "discord", discord_id, models.UserRole.B2C_GAMER)
+    return process_sso_login(db, response, email, username, "discord", discord_id, models.UserRole.B2C)
 
 @router.get("/callback/azure")
 async def callback_azure(request: Request, response: Response, db: Session = Depends(get_db)):
@@ -75,24 +77,27 @@ async def callback_azure(request: Request, response: Response, db: Session = Dep
         raise HTTPException(status_code=400, detail="Microsoft Entra authentication rejected.")
 
     email = user_info.get("email") or user_info.get("preferred_username")
+    username = user_info.get("name") or email.split('@')[0]
     azure_id = user_info.get("sub")
     
-    return process_sso_login(db, response, email, "azure", azure_id, models.UserRole.B2B_ENTERPRISE)
+    return process_sso_login(db, response, email, username, "azure", azure_id, models.UserRole.B2B)
 
-def process_sso_login(db: Session, response: Response, email: str, provider: str, sso_id: str, role: models.UserRole):
+def process_sso_login(db: Session, response: Response, email: str, username: str, provider: str, sso_id: str, role: models.UserRole):
     if not email:
         raise HTTPException(status_code=400, detail="Email verification required.")
 
-    user = db.query(models.User).filter((models.User.email == email) | (models.User.sso_id == sso_id)).first()
+    # Search for user by SSO ID primarily, then email
+    user = db.query(models.User).filter((models.User.sso_id == sso_id) | (models.User.email == email)).first()
 
     if not user:
         user = models.User(
             email=email,
+            username=username,
             role=role,
             sso_provider=provider,
             sso_id=sso_id,
         )
-        if role == models.UserRole.B2C_GAMER:
+        if role == models.UserRole.B2C:
             user.moonlight_pin = generate_moonlight_pin()
         else:
             user.ssh_public_key = generate_ssh_keys()
@@ -101,24 +106,28 @@ def process_sso_login(db: Session, response: Response, email: str, provider: str
         db.commit()
         db.refresh(user)
 
-        wallet = models.Wallet(user_id=user.id)
-        db.add(wallet)
+    # REPAIR/INITIALIZE WALLET: 
+    # Ensure every user has a wallet record. If they don't, the Admin page will crash.
+    if not user.wallet:
+        new_wallet = models.Wallet(user_id=user.id, balance_hours=0.0)
+        db.add(new_wallet)
         db.commit()
+        db.refresh(user)
 
     # Generate the authentication token
     jwt_token = create_access_token(data={"sub": str(user.id), "role": user.role})
     
-    # IMPORTANT: Redirect to Vercel and attach the token in the URL so the frontend can catch it
-    redirect_url = f"{FRONTEND_URL}/login?token={jwt_token}"
+    # FIX: Redirect to /auth/callback so the "Sorting Hat" logic can run
+    redirect_url = f"{FRONTEND_URL}/auth/callback?token={jwt_token}"
     redirect_response = RedirectResponse(url=redirect_url, status_code=302)
     
-    # Set the cookie with proper cross-origin settings for cloud deployment
+    # Set the cookie with proper cross-origin settings
     redirect_response.set_cookie(
         key="access_token",
         value=jwt_token,
         httponly=True,
-        secure=True,         # Required for cross-domain cookies in production
-        samesite="none",     # Allows the cookie to be sent from Render to Vercel
+        secure=True,         
+        samesite="none",     
         max_age=86400,
         path="/"
     )
@@ -135,7 +144,6 @@ def logout(request: Request, response: Response):
     if token:
         redis_client.setex(f"blacklist_jwt:{token}", 86400, "revoked")
     
-    # Clear the cookie using the same cross-origin settings
     response.delete_cookie(
         "access_token", 
         httponly=True, 

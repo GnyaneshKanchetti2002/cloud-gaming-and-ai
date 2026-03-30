@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Play, Clock, Zap, Loader2, StopCircle } from 'lucide-react';
+import { API_BASE_URL } from '../lib/api'; // <-- Centralized API path imported here
 
 interface InstanceRecord {
   id: number;
@@ -16,20 +17,20 @@ export default function GamingDashboard() {
   const [user, setUser] = useState<any>(null);
   const router = useRouter();
 
-  // --- THE FIX: Helper to grab the token for all API requests ---
+  // --- Helper to grab the token for all API requests ---
   const getAuthHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     return {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}` // This proves to FastAPI who you are
+      "Authorization": `Bearer ${token}` 
     };
   };
 
   const fetchInstances = async (userId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
-      const res = await fetch(`${baseUrl}/api/proxmox/instances/${userId}`, { 
-        headers: getAuthHeaders(), // <-- Applied here
+      // Clean, centralized fetch using API_BASE_URL
+      const res = await fetch(`${API_BASE_URL}/proxmox/instances/${userId}`, { 
+        headers: getAuthHeaders(),
         credentials: 'include' 
       });
       if (res.ok) {
@@ -43,7 +44,6 @@ export default function GamingDashboard() {
 
   useEffect(() => {
     const authenticate = async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
       const token = localStorage.getItem('token');
       
       // If there is no token in storage, kick them out immediately
@@ -53,8 +53,8 @@ export default function GamingDashboard() {
       }
 
       try {
-        const res = await fetch(`${baseUrl}/api/auth/me`, { 
-          headers: getAuthHeaders(), // <-- Applied here
+        const res = await fetch(`${API_BASE_URL}/auth/me`, { 
+          headers: getAuthHeaders(),
           credentials: 'include' 
         });
         
@@ -84,10 +84,9 @@ export default function GamingDashboard() {
   const handleLaunch = async (gameTitle: string) => {
     setLaunchingGame(gameTitle);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
-      await fetch(`${baseUrl}/api/proxmox/provision`, {
+      await fetch(`${API_BASE_URL}/proxmox/provision`, {
         method: "POST",
-        headers: getAuthHeaders(), // <-- Applied here
+        headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify({
           node_name: `Gamer-Node-${Math.floor(Math.random() * 1000)}`,
@@ -106,10 +105,9 @@ export default function GamingDashboard() {
 
   const handleKill = async (instanceId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
-      await fetch(`${baseUrl}/api/proxmox/kill/${instanceId}`, {
+      await fetch(`${API_BASE_URL}/proxmox/kill/${instanceId}`, {
         method: "DELETE",
-        headers: getAuthHeaders(), // <-- Applied here
+        headers: getAuthHeaders(),
         credentials: "include"
       });
       if (user?.id) fetchInstances(user.id);
@@ -127,7 +125,7 @@ export default function GamingDashboard() {
       <div className="flex flex-col xl:flex-row gap-8 items-start mt-12">
         <div className="flex-1 space-y-2">
           <h1 className="text-4xl font-black italic tracking-wide text-white drop-shadow-md">
-            WELCOME BACK <span className="text-fuchsia-400">PLAYER_ONE</span>
+            WELCOME BACK <span className="text-fuchsia-400">{user?.username || 'PLAYER_ONE'}</span>
           </h1>
           <p className="text-zinc-400 font-medium tracking-wide">Ready to re-enter the mainframe?</p>
         </div>

@@ -1,7 +1,9 @@
+// frontend/src/app/admin/page.tsx
+
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { API_BASE_URL } from '@/app/lib/api'; // Adjust the import path if necessary
+import { API_BASE_URL } from '@/app/lib/api'; 
 
 interface InstanceRecord {
   id: number;
@@ -21,15 +23,27 @@ export default function AdminDashboard() {
   const [userPage, setUserPage] = useState(0);
   const router = useRouter();
 
+  // --- ADDED: Helper to grab the token for all admin API requests ---
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}` 
+    };
+  };
+
   const fetchInstances = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${baseUrl}/api/proxmox/instances`, { credentials: "include" });
+      // FIX: Use API_BASE_URL and add Auth Headers
+      const res = await fetch(`${API_BASE_URL}/proxmox/instances`, { 
+          headers: getAuthHeaders(),
+          credentials: "include" 
+      });
       if (res.ok) {
         const data = await res.json();
         setInstances(data);
         
-        // Calculate mock revenue based on active instances (assumes 12GB B2B and 24GB B2C variants)
+        // Calculate mock revenue
         const hourlyRate = data.filter((i: any) => i.status !== 'destroying' && i.status !== 'error')
           .reduce((sum: number, i: any) => sum + (i.vram_allocation * 0.15), 0);
         setRevenue(hourlyRate);
@@ -43,8 +57,11 @@ export default function AdminDashboard() {
 
   const fetchUsers = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      const res = await fetch(`${baseUrl}/api/users/?skip=${userPage * 20}&limit=20`, { credentials: "include" });
+      // FIX: Use API_BASE_URL and add Auth Headers
+      const res = await fetch(`${API_BASE_URL}/users/?skip=${userPage * 20}&limit=20`, { 
+          headers: getAuthHeaders(),
+          credentials: "include" 
+      });
       if (res.ok) setUsers(await res.json());
     } catch (e) {
       console.error("Failed to fetch identities", e);
@@ -65,9 +82,9 @@ export default function AdminDashboard() {
 
   const handleKill = async (instanceId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-      await fetch(`${baseUrl}/api/proxmox/kill/${instanceId}`, {
+      await fetch(`${API_BASE_URL}/proxmox/kill/${instanceId}`, {
         method: "DELETE",
+        headers: getAuthHeaders(),
         credentials: "include"
       });
       fetchInstances();
@@ -78,25 +95,30 @@ export default function AdminDashboard() {
 
   const handleBanUser = async (id: number) => {
     if (!confirm("Are you sure you want to permanently suspend this identity and vaporize all of their streams?")) return;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    await fetch(`${baseUrl}/api/users/${id}/ban`, { method: "POST", credentials: "include" });
+    await fetch(`${API_BASE_URL}/users/${id}/ban`, { 
+        method: "POST", 
+        headers: getAuthHeaders(),
+        credentials: "include" 
+    });
     fetchUsers();
-    fetchInstances(); // Instantly visually remove their streams if they had any
+    fetchInstances(); 
   };
 
   const handleDeleteUser = async (id: number) => {
     if (!confirm("Warning: This removes the user from the visible system (Soft Delete). Proceed?")) return;
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    await fetch(`${baseUrl}/api/users/${id}`, { method: "DELETE", credentials: "include" });
+    await fetch(`${API_BASE_URL}/users/${id}`, { 
+        method: "DELETE", 
+        headers: getAuthHeaders(),
+        credentials: "include" 
+    });
     fetchUsers();
   };
 
   const handleToggleRole = async (id: number, currentRole: string) => {
     const newRole = currentRole === 'b2b_enterprise' ? 'b2c_gamer' : 'b2b_enterprise';
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    await fetch(`${baseUrl}/api/users/${id}/role`, {
+    await fetch(`${API_BASE_URL}/users/${id}/role`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(), // Includes Content-Type and Auth
         body: JSON.stringify({ role: newRole }),
         credentials: "include"
     });
@@ -109,10 +131,9 @@ export default function AdminDashboard() {
     const reason = prompt("Enter audit reason for this accounting change:");
     if (!reason) return;
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    await fetch(`${baseUrl}/api/users/${id}/wallet`, {
+    await fetch(`${API_BASE_URL}/users/${id}/wallet`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ hours_added: parseFloat(amountStr), reason }),
         credentials: "include"
     });
@@ -264,8 +285,10 @@ export default function AdminDashboard() {
         <div className="flex justify-between items-center p-4 border-b border-green-900/30 bg-gradient-to-r from-green-900/20 to-transparent">
           <h3 className="text-sm text-green-400 uppercase tracking-widest">Identities & Access Control</h3>
           <div className="flex gap-2">
-             <button disabled={userPage === 0} onClick={() => setUserPage(userPage - 1)} className="px-3 py-1 bg-green-900/40 border border-green-900 hover:bg-green-800 disabled:opacity-30 text-xs font-bold uppercase text-green-400">Past</button>
-             <button onClick={() => setUserPage(userPage + 1)} className="px-3 py-1 bg-green-900/40 border border-green-900 hover:bg-green-800 text-xs font-bold uppercase text-green-400">Next</button>
+             <div className="flex gap-2">
+                 <button disabled={userPage === 0} onClick={() => setUserPage(userPage - 1)} className="px-3 py-1 bg-green-900/40 border border-green-900 hover:bg-green-800 disabled:opacity-30 text-xs font-bold uppercase text-green-400">Past</button>
+                 <button onClick={() => setUserPage(userPage + 1)} className="px-3 py-1 bg-green-900/40 border border-green-900 hover:bg-green-800 text-xs font-bold uppercase text-green-400">Next</button>
+             </div>
           </div>
         </div>
         <div className="overflow-x-auto">

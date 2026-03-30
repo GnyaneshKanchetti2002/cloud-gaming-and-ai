@@ -1,18 +1,23 @@
-from pydantic import BaseModel
+# backend/api/schemas.py
+
+from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
+# Ensure these are imported correctly from your local models file
 from .models import InstanceStatus, UserRole
 
 # --- User Schemas ---
+
 class UserBase(BaseModel):
-    email: str
-    role: UserRole
+    email: EmailStr # Changed to EmailStr for better validation if using pydantic[email]
+    role: UserRole  # This will return 'B2B' or 'B2C' as defined in your Enum
 
 class UserCreate(UserBase):
     password: Optional[str] = None
+    username: Optional[str] = None # Added for Discord/Display name support
 
 class UserLogin(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 class Token(BaseModel):
@@ -27,7 +32,8 @@ class TokenData(BaseModel):
 
 class UserResponse(UserBase):
     id: int
-    moonlight_pin: Optional[int] = None
+    username: Optional[str] = None # Helpful for displaying "Welcome, Aryan"
+    moonlight_pin: Optional[str] = None # Changed to str as PINs can have leading zeros
     is_admin: bool
     is_active: bool
     is_banned: bool
@@ -36,6 +42,7 @@ class UserResponse(UserBase):
         from_attributes = True
 
 # --- Instance Schemas ---
+
 class InstanceBase(BaseModel):
     vram_allocation: int
     os_template: str
@@ -58,6 +65,7 @@ class InstanceResponse(InstanceBase):
         from_attributes = True
 
 # --- Telemetry Schemas ---
+
 class SessionTelemetryBase(BaseModel):
     instance_id: int
 
@@ -73,6 +81,7 @@ class SessionTelemetryResponse(SessionTelemetryBase):
         from_attributes = True
 
 # --- Wallet Schemas ---
+
 class WalletTransactionResponse(BaseModel):
     id: int
     user_id: int

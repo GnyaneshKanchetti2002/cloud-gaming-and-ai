@@ -8,16 +8,16 @@ from .database import Base
 # ENUMS: The Guardrails for your State Machine
 # -------------------------------------------------------------------
 class UserRole(str, enum.Enum):
-    B2B_ENTERPRISE = "b2b_enterprise"
-    B2C_GAMER = "b2c_gamer"
+    B2B = "B2B"  # Matches frontend 'B2B' logic
+    B2C = "B2C"  # Matches frontend 'B2C' logic
 
 class InstanceStatus(str, enum.Enum):
     PENDING = "pending"             # API received request, waiting for Celery
     PROVISIONING = "provisioning"   # Proxmox is actively cloning or mounting SAN
-    RUNNING = "running"             # VM is online, QEMU Guest Agent responding, billing active
-    STOPPING = "stopping"           # Safely unmounting B2B data, do not re-slice yet
+    RUNNING = "running"             # VM is online, billing active
+    STOPPING = "stopping"           # Safely unmounting B2B data
     DESTROYING = "destroying"       # Vaporizing the B2C gaming clone
-    ERROR = "error"                 # Hardware/Network failure, billing paused, admin alerted
+    ERROR = "error"                 # Hardware failure, billing paused
 
 # -------------------------------------------------------------------
 # CORE MODELS
@@ -27,16 +27,18 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, nullable=True) # Added for Discord display names
     role = Column(Enum(UserRole), nullable=False)
     
     # Enterprise Infrastructure & SSO Mapping
-    sso_provider = Column(String, nullable=True)          # 'azure', 'discord', 'google', 'local'
+    sso_provider = Column(String, nullable=True)          # 'discord', 'google', etc.
     sso_id = Column(String, unique=True, index=True, nullable=True) 
-    hashed_password = Column(String, nullable=True)       # Nullable because SSO users don't have passwords
+    hashed_password = Column(String, nullable=True)
     
-    # Zero-Touch Configuration (Injected into QEMU Guest Agent)
-    moonlight_pin = Column(Integer, nullable=True)        # 4-Digit auto-generated PIN for B2C
-    ssh_public_key = Column(String, nullable=True)        # Generated RSA/Ed25519 key for B2B
+    # Zero-Touch Configuration
+    # FIX: Changed to String. If a PIN is 0521, Integer makes it 521, breaking login.
+    moonlight_pin = Column(String, nullable=True)         
+    ssh_public_key = Column(String, nullable=True)        # For B2B RSA keys
     
     # Admin & Moderation Flags
     is_admin = Column(Boolean, default=False, nullable=False)
@@ -52,59 +54,52 @@ class Wallet(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
-    balance_hours = Column(Float, default=0.0)  # Used for 20-Hour Standard Passes
+    balance_hours = Column(Float, default=0.0)
     
-    # Relationships
     user = relationship("User", back_populates="wallet")
 
 class Instance(Base):
     """
-    The core record tying a user to a physical Proxmox Virtual Machine.
+    Ties a user to a physical Proxmox VM.
     """
     __tablename__ = "instances"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    node_name = Column(String, nullable=False) # Retaining for frontend dashboard naming
+    node_name = Column(String, nullable=False) 
     
     # Hardware & Hypervisor Tracking
-    proxmox_vmid = Column(Integer, nullable=True)          # e.g., 105 (crucial for API commands)
+    proxmox_vmid = Column(Integer, nullable=True)          # e.g., 105
     physical_node = Column(String, nullable=True)          # e.g., 'pve-node-04'
-    vlan_id = Column(Integer, nullable=True)               # e.g., 101 (Micro-segmentation)
+    vlan_id = Column(Integer, nullable=True)               # Micro-segmentation
     os_template = Column(String, nullable=True)            # e.g., 'WINDOWS_11_GAMER'
     
     # Resource Allocation
-    vram_allocation = Column(Integer, nullable=False)      # e.g., 12 or 24 (in GB)
-    ip_address = Column(String, nullable=True)             # The dynamic IP assigned to the VM
+    vram_allocation = Column(Integer, nullable=False)      # VRAM slice size in GB
+    ip_address = Column(String, nullable=True)
     
     # State Machine
     status = Column(Enum(InstanceStatus), default=InstanceStatus.PENDING, nullable=False)
     
-    # Relationships
     user = relationship("User", back_populates="instances")
     telemetry = relationship("SessionTelemetry", back_populates="instance", uselist=False)
 
 class SessionTelemetry(Base):
     """
-    The black box recorder for SLA enforcement, upsells, and refund defense.
+    Black box recorder for SLA and performance.
     """
     __tablename__ = "session_telemetry"
 
     id = Column(Integer, primary_key=True, index=True)
     instance_id = Column(Integer, ForeignKey("instances.id"), unique=True, nullable=False)
     
-    # Time Tracking (UTC)
     start_time = Column(DateTime, default=datetime.utcnow, nullable=False)
     end_time = Column(DateTime, nullable=True)
     
-    # Performance & Diagnostics
-    vram_peak_usage = Column(Float, nullable=True)         # Monitored for B2B upsells (e.g., 11.9 GB)
-    network_ping = Column(Integer, nullable=True)          # Average latency in ms (Refund defense)
+    vram_peak_usage = Column(Float, nullable=True)
+    network_ping = Column(Integer, nullable=True)
+    termination_reason = Column(String, nullable=True)
     
-    # Lifecycle Logging
-    termination_reason = Column(String, nullable=True)     # e.g., 'USER_STOP', 'FUNDS_DEPLETED', 'SHIFT_CHANGE'
-    
-    # Relationships
     instance = relationship("Instance", back_populates="telemetry")
 
 class WalletTransaction(Base):
@@ -112,11 +107,10 @@ class WalletTransaction(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    admin_id = Column(Integer, ForeignKey("users.id"), nullable=False) # The admin who authorized
-    hours_added = Column(Float, nullable=False) # Negative if deducted
+    admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    hours_added = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     reason = Column(String, nullable=True)
     
-    # Relationships
     user = relationship("User", foreign_keys=[user_id])
     admin = relationship("User", foreign_keys=[admin_id])

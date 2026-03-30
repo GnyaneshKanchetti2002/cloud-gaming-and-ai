@@ -1,0 +1,44 @@
+# docker-compose.staging.yml
+services:
+  # --- Backend API ---
+  backend-staging:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env.staging
+    environment:
+      - DATABASE_URL=sqlite:///./cga_staging.db
+      - REDIS_URL=redis://redis-staging:6379/0
+    # FIX: Point to api.main:app because main.py is in the api folder
+    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+    depends_on:
+      - redis-staging
+
+  # --- Redis ---
+  redis-staging:
+    image: redis/redis-stack-server:latest
+    ports:
+      - "6379:6379"
+
+  # --- Celery Worker ---
+  # --- Celery Worker ---
+  worker-staging:
+    build:
+      context: ./backend
+    # FIX: Point to api.celery_app:celery_app
+    command: celery -A api.celery_app.celery_app worker --loglevel=info 
+    env_file:
+      - ./backend/.env.staging
+    # backend-staging service section
+    environment:
+      - DATABASE_URL=sqlite:///./cga_staging.db
+      - REDIS_URL=redis://redis-staging:6379/0
+      - FRONTEND_URL=http://localhost:3000
+      - DISCORD_REDIRECT_URI=http://localhost:8000/api/auth/callback/discord
+      - SECRET_KEY=liquid_compute_staging_secret_key_99 # Must match .env
+    depends_on:
+      - redis-staging
+      - backend-staging

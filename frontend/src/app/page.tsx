@@ -1,33 +1,63 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Shield, Zap } from 'lucide-react';
+import { ArrowLeft, Shield, Zap, Lock } from 'lucide-react';
 
 export default function LandingPage() {
   const router = useRouter();
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
-  // The Gatekeeper Function
-  const handleProtectedNavigation = (path: string) => {
-    // We check if a 'token' exists in the browser's storage
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-
+  // Sync state with localStorage on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    const role = localStorage.getItem('user_role'); // Expected: 'B2B' or 'B2C'
+    
     if (token) {
-      // If logged in, go to the requested page
-      router.push(path);
-    } else {
-      // If not logged in, force them to the login page
+      setIsLoggedIn(true);
+      setUserRole(role);
+    }
+  }, []);
+
+  /**
+   * BUG FIX 1 & 2: Role-Based Gatekeeper
+   * Prevents cross-access and ensures users only enter their designated portal.
+   */
+  const handleProtectedNavigation = (targetPath: string, requiredRole: string) => {
+    if (typeof window === 'undefined') return;
+
+    const token = localStorage.getItem('token');
+    const currentRole = localStorage.getItem('user_role');
+
+    // Scenario: Not Logged In
+    if (!token) {
+      // Store intent so login page knows where they wanted to go
+      localStorage.setItem('intended_path', targetPath);
       router.push('/login');
+      return;
+    }
+
+    // Scenario: Logged In - Check for Role Match
+    if (currentRole === requiredRole) {
+      router.push(targetPath);
+    } else {
+      // FIX: If a Gamer tries to enter Enterprise (or vice versa), 
+      // redirect them to their actual authorized dashboard instead of allowing access.
+      const authorizedPath = currentRole === 'B2B' ? '/enterprise' : '/gaming';
+      router.push(authorizedPath);
     }
   };
 
   return (
     <div className="flex flex-col md:flex-row h-screen w-full bg-slate-950 overflow-hidden">
       
-      {/* B2B Enterprise Section - Converted to a div with onClick */}
+      {/* B2B Enterprise Section */}
       <div 
-        onClick={() => handleProtectedNavigation('/enterprise')} 
-        className="group relative w-full md:w-1/2 h-1/2 md:h-full flex flex-col justify-center items-center text-center p-8 md:p-12 overflow-hidden bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 transition-all duration-700 hover:w-full md:hover:w-[60%] cursor-pointer z-10"
+        onClick={() => handleProtectedNavigation('/enterprise', 'B2B')} 
+        className={`group relative w-full md:w-1/2 h-1/2 md:h-full flex flex-col justify-center items-center text-center p-8 md:p-12 overflow-hidden bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 transition-all duration-700 hover:w-full md:hover:w-[60%] cursor-pointer z-10 ${
+          isLoggedIn && userRole === 'B2C' ? 'opacity-50 grayscale-[0.5]' : ''
+        }`}
       >
         {/* Background Grid & Particles */}
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20" />
@@ -36,7 +66,11 @@ export default function LandingPage() {
         <div className="relative z-10 space-y-6 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
           <div className="flex justify-center">
             <div className="p-4 bg-slate-800/50 rounded-2xl border border-slate-700 backdrop-blur-sm group-hover:border-blue-500/50 transition-colors">
-              <Shield className="w-10 h-10 md:w-12 md:h-12 text-blue-400 group-hover:text-blue-300" />
+              {isLoggedIn && userRole === 'B2C' ? (
+                <Lock className="w-10 h-10 md:w-12 md:h-12 text-slate-500" />
+              ) : (
+                <Shield className="w-10 h-10 md:w-12 md:h-12 text-blue-400 group-hover:text-blue-300" />
+              )}
             </div>
           </div>
           <div>
@@ -47,16 +81,19 @@ export default function LandingPage() {
           </div>
           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-500 pt-4 hidden md:block">
              <span className="inline-flex items-center text-blue-400 font-semibold">
-               Access Corporate Portal <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+               {isLoggedIn && userRole === 'B2C' ? "Restricted Access" : "Access Corporate Portal"} 
+               <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
              </span>
           </div>
         </div>
       </div>
 
-      {/* B2C Gaming Section - Converted to a div with onClick */}
+      {/* B2C Gaming Section */}
       <div 
-        onClick={() => handleProtectedNavigation('/gaming')} 
-        className="group relative w-full md:w-1/2 h-1/2 md:h-full flex flex-col justify-center items-center text-center p-8 md:p-12 overflow-hidden bg-zinc-950 transition-all duration-700 hover:w-full md:hover:w-[60%] cursor-pointer z-10"
+        onClick={() => handleProtectedNavigation('/gaming', 'B2C')} 
+        className={`group relative w-full md:w-1/2 h-1/2 md:h-full flex flex-col justify-center items-center text-center p-8 md:p-12 overflow-hidden bg-zinc-950 transition-all duration-700 hover:w-full md:hover:w-[60%] cursor-pointer z-10 ${
+          isLoggedIn && userRole === 'B2B' ? 'opacity-50 grayscale-[0.5]' : ''
+        }`}
       >
         {/* Background Patterns */}
         <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(217,70,239,0.05)_50%,transparent_75%,transparent_100%)] bg-[length:250px_250px] animate-[slide_20s_linear_infinite]" />
@@ -65,7 +102,11 @@ export default function LandingPage() {
         <div className="relative z-10 space-y-6 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
           <div className="flex justify-center">
             <div className="p-4 bg-zinc-900/80 rounded-2xl border border-zinc-800 backdrop-blur-sm group-hover:border-fuchsia-500/50 transition-colors group-hover:shadow-[0_0_30px_rgba(217,70,239,0.3)]">
-              <Zap className="w-10 h-10 md:w-12 md:h-12 text-rose-500 fill-rose-500/20 group-hover:text-fuchsia-400" />
+              {isLoggedIn && userRole === 'B2B' ? (
+                <Lock className="w-10 h-10 md:w-12 md:h-12 text-zinc-600" />
+              ) : (
+                <Zap className="w-10 h-10 md:w-12 md:h-12 text-rose-500 fill-rose-500/20 group-hover:text-fuchsia-400" />
+              )}
             </div>
           </div>
           <div>
@@ -76,7 +117,8 @@ export default function LandingPage() {
           </div>
           <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-500 pt-4 hidden md:block">
              <span className="inline-flex items-center text-fuchsia-400 font-bold tracking-widest uppercase text-sm">
-               Open Console <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
+               {isLoggedIn && userRole === 'B2B' ? "Restricted Access" : "Open Console"} 
+               <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
              </span>
           </div>
         </div>

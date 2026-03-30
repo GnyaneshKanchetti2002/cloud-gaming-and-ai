@@ -1,16 +1,17 @@
+# backend/api/main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.sessions import SessionMiddleware  # <--- 1. ADDED IMPORT
+from starlette.middleware.sessions import SessionMiddleware
 import os
 
-# Import your routers (adjust these if your file names are different)
+# Import your routers
 from api.routers import auth, users, payments, proxmox 
 
-app = FastAPI()
+app = FastAPI(title="Liquid Compute Pool API")
 
-# --- Session Configuration (ADDED FOR OAUTH) ---
-# Authlib requires a session to temporarily store the OAuth state during login
-# In Render, you should add a 'SECRET_KEY' environment variable with a long random string.
+# --- 1. SESSION CONFIGURATION (OAUTH) ---
+# Authlib needs this to store OAuth state during the Discord/Azure handshake
 SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-session-key-change-this-later")
 
 app.add_middleware(
@@ -19,10 +20,11 @@ app.add_middleware(
     max_age=3600  # 1 hour session lifetime
 )
 
-# --- CORS Configuration ---
+# --- 2. CORS CONFIGURATION ---
 origins = [
-    "http://localhost:3000", # Local Next.js
-    os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app") # Production Next.js
+    "http://localhost:3000",      # Local Next.js
+    "http://127.0.0.1:3000",      # Local Next.js (IP fallback)
+    os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app") 
 ]
 
 app.add_middleware(
@@ -33,14 +35,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- Include Routers ---
-# This connects your separate route files to the main application
+# --- 3. INCLUDE ROUTERS ---
+# The prefixes here match your frontend fetch calls
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
 app.include_router(proxmox.router, prefix="/api/proxmox", tags=["proxmox"])
 
-# Optional: A simple health check route to verify the server is running
 @app.get("/")
 def read_root():
-    return {"status": "Backend is running smoothly!"}
+    return {
+        "status": "online",
+        "message": "Liquid Compute Pool Backend is running smoothly!"
+    }

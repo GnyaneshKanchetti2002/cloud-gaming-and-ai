@@ -1,10 +1,65 @@
+// frontend/src/app/admin/layout.tsx
+
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Activity, Terminal, ShieldAlert, Cpu, Database, Network, Server, Settings, Unlock, Menu, X } from 'lucide-react';
+import { API_BASE_URL } from '@/app/lib/api'; 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const router = useRouter();
+
+  // --- THE BOUNCER: Checks if user is an Admin before rendering ---
+  useEffect(() => {
+    const verifyAdminClearance = async () => {
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include'
+        });
+
+        if (res.ok) {
+          const user = await res.json();
+          
+          if (user.is_admin) {
+            setIsAuthorized(true); // Access Granted!
+          } else {
+            // Access Denied! Send them back to their respective dashboard
+            console.warn("Unauthorized access attempt. Rerouting...");
+            router.push(user.role === 'B2B' ? '/enterprise' : '/gaming');
+          }
+        } else {
+          router.push('/login');
+        }
+      } catch (error) {
+        router.push('/login');
+      }
+    };
+
+    verifyAdminClearance();
+  }, [router]);
+
+  // Show a cool loading screen while verifying clearance
+  if (!isAuthorized) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-[#020502]">
+        <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div className="text-green-500 font-mono tracking-widest animate-pulse text-sm font-bold">
+          VERIFYING OMEGA CLEARANCE...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex bg-[#020502] text-green-500 min-h-screen font-mono selection:bg-green-500/30 overflow-hidden">
@@ -35,7 +90,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="p-6 border-b border-green-900/50 hidden md:block">
           <Link href="/">
              <h1 className="text-2xl font-black tracking-widest text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.5)] cursor-pointer hover:text-white transition-colors">
-                SYS<span className="text-white">_ADMIN</span>
+               SYS<span className="text-white">_ADMIN</span>
              </h1>
           </Link>
           <p className="text-[10px] text-green-600 mt-2 uppercase tracking-[0.2em] font-bold animate-pulse">

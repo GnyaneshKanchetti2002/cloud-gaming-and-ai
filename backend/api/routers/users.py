@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from typing import List
 from ..database import get_db
 from .. import models, schemas
-from ..auth import get_admin_user, redis_client
+from ..auth import get_admin_user, get_current_user, redis_client
 from ..tasks import destroy_node_background
 
 router = APIRouter()
 
+# --- Request Schemas ---
 class RoleUpdateRequest(BaseModel):
     role: models.UserRole
 
@@ -15,14 +17,29 @@ class WalletUpdateRequest(BaseModel):
     hours_added: float
     reason: str
 
-@router.get("/")
+# --- New Endpoint: The Identity Sorter ---
+@router.get("/me", response_model=schemas.UserResponse)
+def get_my_profile(
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    CRITICAL: This is the endpoint used by the frontend /auth/callback 
+    to determine if the user is B2B or B2C and redirect them correctly.
+    """
+    return current_user
+
+# --- Admin Endpoints ---
+
+@router.get("/", response_model=List[dict]) # You can also create a specific ListUser schema
 def list_users(
     skip: int = 0, 
     limit: int = 50, 
     db: Session = Depends(get_db),
     admin: models.User = Depends(get_admin_user)
 ):
-    users = db.query(models.User).filter(models.User.is_active == True).order_by(models.User.id.desc()).offset(skip).limit(limit).all()
+    users = db.query(models.User).filter(
+        models.User.is_active == True
+    ).order_by(models.User.id.desc()).offset(skip).limit(limit).all()
     
     results = []
     for user in users:
@@ -45,7 +62,11 @@ def update_user_role(
     db: Session = Depends(get_db),
     admin: models.User = Depends(get_admin_user)
 ):
-    user = db.query(models.User).filter(models.User.id == user_id, models.User.is_active == True).first()
+    user = db.query(models.User).filter(
+        models.User.id == user_id, 
+        models.User.is_active == True
+    ).first()
+    
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -123,11 +144,16 @@ def delete_user(
     # Soft delete
     user.is_active = False
     
-    # Safely clear their tokens and active streams if any
+    # Safely clear their active streams if any
     active_instances = db.query(models.Instance).filter(
         models.Instance.user_id == user.id,
-        models.Instance.status.in_([models.InstanceStatus.RUNNING, models.InstanceStatus.PROVISIONING, models.InstanceStatus.PENDING])
+        models.Instance.status.in_([
+            models.InstanceStatus.RUNNING, 
+            models.InstanceStatus.PROVISIONING, 
+            models.InstanceStatus.PENDING
+        ])
     ).all()
+    
     for instance in active_instances:
         instance.status = models.InstanceStatus.DESTROYING
     
