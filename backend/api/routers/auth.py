@@ -125,8 +125,8 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
         key="access_token",
         value=jwt_token,
         httponly=True,
-        secure=IS_PROD,         
-        samesite="lax" if not IS_PROD else "none",     
+        secure=IS_PROD,
+        samesite="lax" if not IS_PROD else "none",
         max_age=86400,
         path="/"
     )
