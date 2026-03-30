@@ -7,17 +7,14 @@ import { API_BASE_URL } from '../../lib/api';
 function AuthHandler() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const hasProcessed = useRef(false); // Prevents React StrictMode double-firing
+  const hasProcessed = useRef(false); 
 
   useEffect(() => {
     const handleAuth = async () => {
-      // Prevent double execution in dev/prod
       if (hasProcessed.current) return;
       
-      // 1. Get the token from the URL (e.g., ?token=xyz...)
       const token = searchParams.get('token'); 
       
-      // FIX 1: If someone navigates here directly without a token, kick them out.
       if (!token) {
         console.warn("No token found in URL. Redirecting to login.");
         router.push('/login?error=missing_token');
@@ -25,10 +22,15 @@ function AuthHandler() {
       }
 
       hasProcessed.current = true;
+      
+      // 1. Save to LocalStorage for API calls
       localStorage.setItem('token', token);
+      
+      // 2. THE FIX: Save to First-Party Cookie for Next.js Middleware!
+      // This allows Vercel route guards to instantly recognize the session
+      document.cookie = `access_token=${token}; path=/; max-age=86400; SameSite=Lax`;
 
       try {
-        // 2. Get user role from your backend
         const response = await fetch(`${API_BASE_URL}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` },
           credentials: "include" 
@@ -40,16 +42,11 @@ function AuthHandler() {
         const role = userData.role; 
         localStorage.setItem('user_role', role);
 
-        // FIX 2: Bulletproof role checking (handles both 'B2B' and 'b2b_enterprise')
         const isB2B = role === 'B2B' || role === 'b2b_enterprise';
-
-        // 3. FIX SCENARIOS: Check if they clicked a specific side before logging in
         const intendedPath = localStorage.getItem('intended_path');
 
         if (intendedPath) {
           localStorage.removeItem('intended_path');
-
-          // Force correct routing based on role even if they clicked the wrong one
           if (intendedPath === '/enterprise' && !isB2B) {
             router.push('/gaming'); 
           } else if (intendedPath === '/gaming' && isB2B) {
@@ -58,7 +55,6 @@ function AuthHandler() {
             router.push(intendedPath);
           }
         } else {
-          // No intended path? Go to their default dashboard
           router.push(isB2B ? '/enterprise' : '/gaming');
         }
 
