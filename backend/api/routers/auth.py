@@ -145,10 +145,10 @@ def logout(request: Request, response: Response):
     
     IS_PROD = os.getenv("RENDER", "false").lower() == "true"
     response.delete_cookie(
-        "access_token", 
-        httponly=True, 
-        secure=IS_PROD, 
-        samesite="lax" if not IS_PROD else "none", 
+        "access_token",
+        httponly=True,
+        secure=IS_PROD,
+        samesite="lax" if not IS_PROD else "none",
         path="/"
     )
     return {"status": "Enterprise sessions forcefully terminated."}
