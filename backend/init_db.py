@@ -1,14 +1,36 @@
-from api.database import engine, Base
-
-# CRITICAL: Import your models so SQLAlchemy registers them in memory before creating tables.
-# Adjust the import path slightly if your models file is named differently.
+# backend/init_db.py
+import os
+from sqlalchemy import create_engine
+from api.database import Base
 from api import models 
 
 def init():
-    print("Creating database tables...")
-    # This executes the SQL to build your tables
-    Base.metadata.create_all(bind=engine)
-    print("Database tables created successfully!")
+    # 1. Fetch the URL from Render environment
+    db_url = os.getenv("DATABASE_URL")
+    
+    if not db_url:
+        print("ERROR: DATABASE_URL not found in environment variables.")
+        return
+
+    # 2. FIX: SQLAlchemy 1.4+ and 2.0+ require 'postgresql://', not 'postgres://'
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql://", 1)
+
+    print(f"Connecting to database for initialization...")
+    
+    try:
+        # Create a temporary engine just for table creation
+        temp_engine = create_engine(db_url)
+        
+        print("Creating database tables...")
+        # This executes the SQL to build your tables based on models.py
+        Base.metadata.create_all(bind=temp_engine)
+        print("Database tables created successfully!")
+        
+    except Exception as e:
+        print(f"CRITICAL ERROR during database init: {e}")
+        # Exit with 1 so Render knows the deploy failed and doesn't start a broken app
+        exit(1)
 
 if __name__ == "__main__":
     init()
