@@ -14,8 +14,9 @@ router = APIRouter()
 config = Config(environ=os.environ)
 oauth = OAuth(config)
 
-# Get the frontend URL dynamically, fallback to Vercel for production
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app")
+# --- PRODUCTION URL HARDENING ---
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app").rstrip("/")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
 
 oauth.register(
     name='discord',
@@ -37,20 +38,21 @@ oauth.register(
 )
 
 def generate_moonlight_pin():
-    # Return as string to preserve leading zeros
     return str(random.randint(1000, 9999))
 
 def generate_ssh_keys():
-    return f"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI{os.urandom(24).hex()} b2b_admin@cga_platform"
+    return f"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI{os.urandom(24).hex()} admin@cga_platform"
 
 @router.get("/login/discord")
 async def login_discord(request: Request):
-    redirect_uri = os.getenv("DISCORD_REDIRECT_URI", "http://localhost:8000/api/auth/callback/discord")
+    # DYNAMIC REDIRECT: Uses the BACKEND_URL from environment variables
+    redirect_uri = f"{BACKEND_URL}/api/auth/callback/discord"
     return await oauth.discord.authorize_redirect(request, redirect_uri)
 
 @router.get("/login/azure")
 async def login_azure(request: Request):
-    redirect_uri = os.getenv("AZURE_REDIRECT_URI", "http://localhost:8000/api/auth/callback/azure")
+    # DYNAMIC REDIRECT: Uses the BACKEND_URL from environment variables
+    redirect_uri = f"{BACKEND_URL}/api/auth/callback/azure"
     return await oauth.azure.authorize_redirect(request, redirect_uri)
 
 @router.get("/callback/discord")
@@ -63,7 +65,7 @@ async def callback_discord(request: Request, response: Response, db: Session = D
         raise HTTPException(status_code=400, detail="Discord authentication rejected.")
 
     email = user_info.get("email")
-    username = user_info.get("username") # Capture Discord username
+    username = user_info.get("username")
     discord_id = str(user_info.get("id"))
     
     return process_sso_login(db, response, email, username, "discord", discord_id, models.UserRole.B2C)
@@ -86,7 +88,6 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
     if not email:
         raise HTTPException(status_code=400, detail="Email verification required.")
 
-    # Search for user by SSO ID primarily, then email
     user = db.query(models.User).filter((models.User.sso_id == sso_id) | (models.User.email == email)).first()
 
     if not user:
@@ -106,28 +107,26 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
         db.commit()
         db.refresh(user)
 
-    # REPAIR/INITIALIZE WALLET: 
-    # Ensure every user has a wallet record. If they don't, the Admin page will crash.
     if not user.wallet:
         new_wallet = models.Wallet(user_id=user.id, balance_hours=0.0)
         db.add(new_wallet)
         db.commit()
         db.refresh(user)
 
-    # Generate the authentication token
     jwt_token = create_access_token(data={"sub": str(user.id), "role": user.role})
     
-    # FIX: Redirect to /auth/callback so the "Sorting Hat" logic can run
+    # Send user to the Frontend "Sorting Hat"
     redirect_url = f"{FRONTEND_URL}/auth/callback?token={jwt_token}"
     redirect_response = RedirectResponse(url=redirect_url, status_code=302)
     
-    # Set the cookie with proper cross-origin settings
+    # Production Cookie Settings
+    IS_PROD = os.getenv("RENDER", "false").lower() == "true"
     redirect_response.set_cookie(
         key="access_token",
         value=jwt_token,
         httponly=True,
-        secure=True,         
-        samesite="none",     
+        secure=IS_PROD,         
+        samesite="lax" if not IS_PROD else "none",     
         max_age=86400,
         path="/"
     )
@@ -144,11 +143,12 @@ def logout(request: Request, response: Response):
     if token:
         redis_client.setex(f"blacklist_jwt:{token}", 86400, "revoked")
     
+    IS_PROD = os.getenv("RENDER", "false").lower() == "true"
     response.delete_cookie(
         "access_token", 
         httponly=True, 
-        secure=True, 
-        samesite="none", 
+        secure=IS_PROD, 
+        samesite="lax" if not IS_PROD else "none", 
         path="/"
     )
     return {"status": "Enterprise sessions forcefully terminated."}

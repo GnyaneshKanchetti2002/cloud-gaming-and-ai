@@ -2,13 +2,14 @@
 import os
 from celery import Celery
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis-staging:6379/0")
+# Fallback to 'redis' (Docker service name) for dev, Render ENV for prod
+REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 celery_app = Celery(
     "worker",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=['api.tasks'] # Tell Celery where to find the tasks
+    include=['api.tasks'] 
 )
 
 celery_app.conf.update(

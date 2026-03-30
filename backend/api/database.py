@@ -1,30 +1,28 @@
+# backend/api/database.py
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# 1. Fetch the Database URL from the environment, with a local fallback
+# 1. Prioritize Render Postgres URL, fallback to local SQLite for dev
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://postgres:password@localhost:5432/cloudgaming" 
+    "sqlite:///./liquid_dev.db" 
 )
 
-# 2. Fix Render's URL format (SQLAlchemy requires 'postgresql://')
-if SQLALCHEMY_DATABASE_URL and SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+# 2. Fix Render's 'postgres://' vs 'postgresql://' driver issue
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# 3. Create the SQLAlchemy engine
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+# 3. Engine Config
+# (SQLite needs 'check_same_thread' False, Postgres doesn't care)
+connect_args = {"check_same_thread": False} if SQLALCHEMY_DATABASE_URL.startswith("sqlite") else {}
 
-# 4. Create a session factory
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=connect_args)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# 5. Create the Base class for your database models
 Base = declarative_base()
 
-
-# --- ADD THIS FUNCTION AT THE BOTTOM ---
-# 6. Dependency to get a database session
 def get_db():
     db = SessionLocal()
     try:

@@ -1,8 +1,8 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Clock, Zap, Loader2, StopCircle } from 'lucide-react';
-import { API_BASE_URL } from '../lib/api'; // <-- Centralized API path imported here
+import { Play, Clock, Zap, Loader2, StopCircle, LogOut } from 'lucide-react'; // <-- Added LogOut icon
+import { API_BASE_URL } from '../lib/api';
 
 interface InstanceRecord {
   id: number;
@@ -17,7 +17,6 @@ export default function GamingDashboard() {
   const [user, setUser] = useState<any>(null);
   const router = useRouter();
 
-  // --- Helper to grab the token for all API requests ---
   const getAuthHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     return {
@@ -28,7 +27,6 @@ export default function GamingDashboard() {
 
   const fetchInstances = async (userId: number) => {
     try {
-      // Clean, centralized fetch using API_BASE_URL
       const res = await fetch(`${API_BASE_URL}/proxmox/instances/${userId}`, { 
         headers: getAuthHeaders(),
         credentials: 'include' 
@@ -46,7 +44,6 @@ export default function GamingDashboard() {
     const authenticate = async () => {
       const token = localStorage.getItem('token');
       
-      // If there is no token in storage, kick them out immediately
       if (!token) {
           router.push('/login');
           return;
@@ -59,7 +56,6 @@ export default function GamingDashboard() {
         });
         
         if (!res.ok) {
-          // Token is invalid or expired. Destroy it and kick them out.
           localStorage.removeItem('token');
           router.push('/login');
           return;
@@ -116,14 +112,29 @@ export default function GamingDashboard() {
     }
   };
 
+  // --- NEW: Secure Logout Handler ---
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user_role');
+    router.push('/login');
+  };
+
   const activeGame = instances.find(i => i.status !== 'terminated' && i.status !== 'destroying');
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 pb-24">
+    <div className="max-w-7xl mx-auto space-y-12 pb-24 px-4 sm:px-6 lg:px-8">
       
       {/* Top Welcome & Digital Wallet */}
       <div className="flex flex-col xl:flex-row gap-8 items-start mt-12">
-        <div className="flex-1 space-y-2">
+        <div className="flex-1 space-y-2 relative w-full">
+          {/* NEW: Disconnect / Logout Button */}
+          <button 
+            onClick={handleLogout}
+            className="absolute top-0 right-0 xl:static xl:float-right flex items-center px-4 py-2 text-xs font-bold text-zinc-400 hover:text-rose-400 border border-transparent hover:border-rose-900/50 hover:bg-rose-950/20 rounded-lg transition-all tracking-widest uppercase"
+          >
+            <LogOut className="w-4 h-4 mr-2" /> Disconnect
+          </button>
+
           <h1 className="text-4xl font-black italic tracking-wide text-white drop-shadow-md">
             WELCOME BACK <span className="text-fuchsia-400">{user?.username || 'PLAYER_ONE'}</span>
           </h1>

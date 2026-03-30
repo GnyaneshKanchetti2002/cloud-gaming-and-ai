@@ -8,43 +8,62 @@ import os
 # Import your routers
 from api.routers import auth, users, payments, proxmox 
 
-app = FastAPI(title="Liquid Compute Pool API")
+app = FastAPI(
+    title="Liquid Compute Pool API",
+    description="Backend API for high-performance cloud gaming and AI compute"
+)
 
 # --- 1. SESSION CONFIGURATION (OAUTH) ---
-# Authlib needs this to store OAuth state during the Discord/Azure handshake
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-session-key-change-this-later")
+# Authlib needs this to store OAuth state during the Discord/Azure handshake.
+# IMPORTANT: In Render dashboard, generate a long random string for SECRET_KEY.
+SECRET_KEY = os.getenv("SECRET_KEY", "dev_secret_key_change_in_production")
+
+# Determine if we are in production to set secure cookie flags
+IS_PROD = os.getenv("RENDER", "false").lower() == "true"
 
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
-    max_age=3600  # 1 hour session lifetime
+    max_age=3600,            # 1 hour session lifetime
+    https_only=IS_PROD,      # Only send cookies over HTTPS in production
+    same_site="lax"          # Essential for cross-site OAuth redirects
 )
 
 # --- 2. CORS CONFIGURATION ---
+# Dynamically load the frontend URL from environment variables.
+# We strip trailing slashes to prevent common CORS mismatch errors.
+frontend_url = os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app").rstrip("/")
+
 origins = [
-    "http://localhost:3000",      # Local Next.js
-    "http://127.0.0.1:3000",      # Local Next.js (IP fallback)
-    os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app") 
+    "http://localhost:3000",      # Local Next.js default
+    "http://127.0.0.1:3000",      # Local Next.js IP fallback
+    frontend_url,                 # Production Vercel App
 ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    allow_credentials=True,       # Required for HttpOnly cookies and Auth headers
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # --- 3. INCLUDE ROUTERS ---
-# The prefixes here match your frontend fetch calls
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
 app.include_router(proxmox.router, prefix="/api/proxmox", tags=["proxmox"])
 
-@app.get("/")
+# --- 4. SYSTEM ENDPOINTS ---
+@app.get("/", tags=["system"])
 def read_root():
     return {
         "status": "online",
+        "environment": "production" if IS_PROD else "development",
         "message": "Liquid Compute Pool Backend is running smoothly!"
     }
+
+@app.get("/health", tags=["system"])
+def health_check():
+    """Endpoint for Render/Uptime monitoring"""
+    return {"status": "healthy"}

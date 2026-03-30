@@ -1,7 +1,9 @@
+# backend/requirements.txt
+
 fastapi[standard]
 uvicorn
 sqlalchemy
-psycopg2-binary
+psycopg2-binary==2.9.9
 pydantic
 pydantic-settings
 celery

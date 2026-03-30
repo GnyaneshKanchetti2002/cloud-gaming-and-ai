@@ -1,10 +1,8 @@
-// frontend/src/app/admin/layout.tsx
-
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Activity, Terminal, ShieldAlert, Cpu, Database, Network, Server, Settings, Unlock, Menu, X } from 'lucide-react';
+import { Activity, Terminal, ShieldAlert, Cpu, Database, Network, Server, Settings, Unlock, Menu, X, LogOut } from 'lucide-react';
 import { API_BASE_URL } from '@/app/lib/api'; 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -36,18 +34,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           } else {
             // Access Denied! Send them back to their respective dashboard
             console.warn("Unauthorized access attempt. Rerouting...");
-            router.push(user.role === 'B2B' ? '/enterprise' : '/gaming');
+            const isB2B = user.role === 'B2B' || user.role === 'b2b_enterprise';
+            router.push(isB2B ? '/enterprise' : '/gaming');
           }
         } else {
+          // Token might be invalid/expired
+          localStorage.removeItem('token');
           router.push('/login');
         }
       } catch (error) {
+        console.error("Connection error during admin verification:", error);
         router.push('/login');
       }
     };
 
     verifyAdminClearance();
   }, [router]);
+
+  // --- Secure Logout Handler ---
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user_role');
+    router.push('/login');
+  };
 
   // Show a cool loading screen while verifying clearance
   if (!isAuthorized) {
@@ -88,7 +97,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <nav className={`fixed md:relative top-0 left-0 w-64 h-screen bg-[#050a05] border-r border-green-900/50 flex flex-col z-40 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         
         <div className="p-6 border-b border-green-900/50 hidden md:block">
-          <Link href="/">
+          <Link href="/admin">
              <h1 className="text-2xl font-black tracking-widest text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.5)] cursor-pointer hover:text-white transition-colors">
                SYS<span className="text-white">_ADMIN</span>
              </h1>
@@ -121,8 +130,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
 
-        <div className="p-4 border-t border-green-900/50 bg-[#020502]">
+        {/* Updated Footer with Logout */}
+        <div className="p-4 border-t border-green-900/50 bg-[#020502] space-y-2">
           <NavItem icon={<Settings size={18} />} label="Daemon Settings" />
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center space-x-3 px-3 py-2.5 rounded cursor-pointer transition-all duration-300 border border-transparent text-red-700 hover:bg-red-950/20 hover:text-red-500 hover:border-red-900/50 uppercase text-xs font-bold tracking-wider"
+          >
+            <LogOut size={18} />
+            <span>Terminate Session</span>
+          </button>
         </div>
       </nav>
 

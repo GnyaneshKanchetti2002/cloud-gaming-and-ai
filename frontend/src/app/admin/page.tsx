@@ -1,5 +1,3 @@
-// frontend/src/app/admin/page.tsx
-
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -23,7 +21,6 @@ export default function AdminDashboard() {
   const [userPage, setUserPage] = useState(0);
   const router = useRouter();
 
-  // --- ADDED: Helper to grab the token for all admin API requests ---
   const getAuthHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     return {
@@ -34,7 +31,6 @@ export default function AdminDashboard() {
 
   const fetchInstances = async () => {
     try {
-      // FIX: Use API_BASE_URL and add Auth Headers
       const res = await fetch(`${API_BASE_URL}/proxmox/instances`, { 
           headers: getAuthHeaders(),
           credentials: "include" 
@@ -43,7 +39,6 @@ export default function AdminDashboard() {
         const data = await res.json();
         setInstances(data);
         
-        // Calculate mock revenue
         const hourlyRate = data.filter((i: any) => i.status !== 'destroying' && i.status !== 'error')
           .reduce((sum: number, i: any) => sum + (i.vram_allocation * 0.15), 0);
         setRevenue(hourlyRate);
@@ -57,7 +52,6 @@ export default function AdminDashboard() {
 
   const fetchUsers = async () => {
     try {
-      // FIX: Use API_BASE_URL and add Auth Headers
       const res = await fetch(`${API_BASE_URL}/users/?skip=${userPage * 20}&limit=20`, { 
           headers: getAuthHeaders(),
           credentials: "include" 
@@ -114,11 +108,14 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  // --- FIX: Bulletproof Role Swapping ---
   const handleToggleRole = async (id: number, currentRole: string) => {
-    const newRole = currentRole === 'b2b_enterprise' ? 'b2c_gamer' : 'b2b_enterprise';
+    const isB2B = currentRole === 'B2B' || currentRole === 'b2b_enterprise';
+    const newRole = isB2B ? 'B2C' : 'B2B';
+    
     await fetch(`${API_BASE_URL}/users/${id}/role`, {
         method: "PUT",
-        headers: getAuthHeaders(), // Includes Content-Type and Auth
+        headers: getAuthHeaders(),
         body: JSON.stringify({ role: newRole }),
         credentials: "include"
     });
@@ -189,7 +186,6 @@ export default function AdminDashboard() {
           
           <div className="grid grid-cols-16 md:grid-cols-24 gap-1 sm:gap-1.5 relative z-10">
             {Array.from({length: 192}).map((_, i) => {
-              // Create dynamic mapping. Show green for active instances.
               const isActiveBlock = i < instances.filter(inst => inst.status === 'running').length * 2;
               const isErrorBlock = i === 191 && instances.some(inst => inst.status === 'error');
               
@@ -285,10 +281,8 @@ export default function AdminDashboard() {
         <div className="flex justify-between items-center p-4 border-b border-green-900/30 bg-gradient-to-r from-green-900/20 to-transparent">
           <h3 className="text-sm text-green-400 uppercase tracking-widest">Identities & Access Control</h3>
           <div className="flex gap-2">
-             <div className="flex gap-2">
-                 <button disabled={userPage === 0} onClick={() => setUserPage(userPage - 1)} className="px-3 py-1 bg-green-900/40 border border-green-900 hover:bg-green-800 disabled:opacity-30 text-xs font-bold uppercase text-green-400">Past</button>
-                 <button onClick={() => setUserPage(userPage + 1)} className="px-3 py-1 bg-green-900/40 border border-green-900 hover:bg-green-800 text-xs font-bold uppercase text-green-400">Next</button>
-             </div>
+             <button disabled={userPage === 0} onClick={() => setUserPage(userPage - 1)} className="px-3 py-1 bg-green-900/40 border border-green-900 hover:bg-green-800 disabled:opacity-30 text-xs font-bold uppercase text-green-400">Past</button>
+             <button onClick={() => setUserPage(userPage + 1)} className="px-3 py-1 bg-green-900/40 border border-green-900 hover:bg-green-800 text-xs font-bold uppercase text-green-400">Next</button>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -306,11 +300,14 @@ export default function AdminDashboard() {
             <tbody className="text-green-500 font-mono">
               {users.length === 0 ? (
                 <tr><td colSpan={6} className="p-8 text-center text-green-900 uppercase">No registered identities found on page {userPage}.</td></tr>
-              ) : users.map((u, i) => (
+              ) : users.map((u, i) => {
+                // FIX: Support formatting for B2B/B2C or old variations
+                const isB2B = u.role === 'B2B' || u.role === 'b2b_enterprise';
+                return (
                 <tr key={i} className="border-b border-green-900/10 hover:bg-green-900/20 transition-colors group">
                   <td className="p-4 opacity-50">#{u.id} {u.is_admin ? <span className="text-yellow-500 font-bold ml-1">(GOD)</span> : ''}</td>
                   <td className="p-4 font-bold text-green-400">{u.email} <span className="text-[10px] text-green-700 ml-2">[{u.sso_provider}]</span></td>
-                  <td className={`p-4 font-bold uppercase ${u.role === 'b2b_enterprise' ? 'text-blue-500' : 'text-purple-500'}`}>{u.role.replace('_', ' ')}</td>
+                  <td className={`p-4 font-bold uppercase ${isB2B ? 'text-blue-500' : 'text-purple-500'}`}>{u.role.replace('_', ' ')}</td>
                   <td className="p-4">{u.balance_hours.toFixed(2)} HRS</td>
                   <td className="p-4">
                      {u.is_banned ? <span className="text-red-500 font-black animate-pulse">[BANNED]</span> : u.is_active ? <span className="text-green-600">[ACTIVE]</span> : <span className="text-zinc-500">[PURGED]</span>}
@@ -326,7 +323,7 @@ export default function AdminDashboard() {
                     )}
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
