@@ -20,20 +20,21 @@ export default function EnterpriseDashboard() {
   const [user, setUser] = useState<any>(null);
   const router = useRouter();
 
-  // --- THE FIX: Helper to grab the token for all API requests ---
+  // --- Helper to grab the token for all API requests ---
   const getAuthHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     return {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}` // This proves to FastAPI who you are
+      "Authorization": `Bearer ${token}` 
     };
   };
 
   const fetchInstances = async (userId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
-      const res = await fetch(`${baseUrl}/api/proxmox/instances/${userId}`, { 
-        headers: getAuthHeaders(), // <-- Secure headers applied
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
+      // FIX: Removed the extra /api prefix
+      const res = await fetch(`${baseUrl}/proxmox/instances/${userId}`, { 
+        headers: getAuthHeaders(),
         credentials: 'include' 
       });
       if (res.ok) {
@@ -49,18 +50,18 @@ export default function EnterpriseDashboard() {
 
   useEffect(() => {
     const authenticate = async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
       const token = localStorage.getItem('token');
       
-      // If there is no token in storage, kick them out immediately
       if (!token) {
           router.push('/login');
           return;
       }
 
       try {
-        const res = await fetch(`${baseUrl}/api/auth/me`, { 
-          headers: getAuthHeaders(), // <-- Secure headers applied
+        // FIX: Removed the extra /api prefix here to stop the 404 crash
+        const res = await fetch(`${baseUrl}/auth/me`, { 
+          headers: getAuthHeaders(),
           credentials: 'include' 
         });
         
@@ -90,10 +91,11 @@ export default function EnterpriseDashboard() {
   const handleProvision = async () => {
     setIsProvisioning(true);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
-      await fetch(`${baseUrl}/api/proxmox/provision`, {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
+      // FIX: Removed the extra /api prefix
+      await fetch(`${baseUrl}/proxmox/provision`, {
         method: "POST",
-        headers: getAuthHeaders(), // <-- Secure headers applied
+        headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify({
           node_name: `AI-Accel-Node-${Math.floor(Math.random() * 1000)}`,
@@ -112,10 +114,11 @@ export default function EnterpriseDashboard() {
 
   const handleKill = async (instanceId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com";
-      await fetch(`${baseUrl}/api/proxmox/kill/${instanceId}`, {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
+      // FIX: Removed the extra /api prefix
+      await fetch(`${baseUrl}/proxmox/kill/${instanceId}`, {
         method: "DELETE",
-        headers: getAuthHeaders(), // <-- Secure headers applied
+        headers: getAuthHeaders(),
         credentials: "include"
       });
       if (user?.id) fetchInstances(user.id);
