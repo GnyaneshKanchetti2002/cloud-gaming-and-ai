@@ -6,7 +6,6 @@ sqlalchemy
 psycopg2-binary==2.9.9
 pydantic
 pydantic-settings
-celery
 redis
 authlib
 python-jose[cryptography]
