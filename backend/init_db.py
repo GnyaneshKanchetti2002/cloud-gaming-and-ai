@@ -19,17 +19,20 @@ def init():
     print(f"Connecting to database for initialization...")
     
     try:
-        # Create a temporary engine just for table creation
         temp_engine = create_engine(db_url)
         
-        print("Creating database tables...")
-        # This executes the SQL to build your tables based on models.py
+        # --- NEW CODE: DROP EXISTING TABLES ---
+        print("Dropping old outdated tables...")
+        Base.metadata.drop_all(bind=temp_engine)
+        
+        # --- REBUILD TABLES ---
+        print("Creating fresh database tables with new schema...")
         Base.metadata.create_all(bind=temp_engine)
-        print("Database tables created successfully!")
+        
+        print("Database reset and tables created successfully!")
         
     except Exception as e:
         print(f"CRITICAL ERROR during database init: {e}")
-        # Exit with 1 so Render knows the deploy failed and doesn't start a broken app
         exit(1)
 
 if __name__ == "__main__":
