@@ -1,9 +1,9 @@
+# backend/api/routers/users.py
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
 
-# The absolute import that caused the crash has been permanently removed.
 from ..database import get_db
 from .. import models, schemas
 from ..auth import get_admin_user, get_current_user, redis_client
@@ -19,6 +19,10 @@ class WalletUpdateRequest(BaseModel):
     hours_added: float
     reason: str
 
+# NEW: Schema for Admin Promotion
+class AdminUpdateRequest(BaseModel):
+    is_admin: bool
+
 # --- Identity Sorter ---
 @router.get("/me", response_model=schemas.UserResponse)
 def get_my_profile(
@@ -30,8 +34,27 @@ def get_my_profile(
     """
     return current_user
 
-# --- Admin Endpoints ---
+@router.get("/wallet/{user_id}")
+def get_wallet_balance(
+    user_id: int, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """Fetches the user's current wallet time balance."""
+    if current_user.id != user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Unauthorized to view this wallet.")
 
+    wallet = db.query(models.Wallet).filter(models.Wallet.user_id == user_id).first()
+    
+    if not wallet:
+        wallet = models.Wallet(user_id=user_id, balance_hours=0.0)
+        db.add(wallet)
+        db.commit()
+        db.refresh(wallet)
+
+    return {"balance_hours": wallet.balance_hours}
+
+# --- Admin Endpoints ---
 @router.get("/", response_model=List[dict])
 def list_users(
     skip: int = 0, 
@@ -76,6 +99,29 @@ def update_user_role(
     db.commit()
     return {"status": "success", "message": f"Identity privileges updated to {request.role}"}
 
+# --- NEW: Admin Promotion Endpoint ---
+@router.put("/{user_id}/admin")
+def update_user_admin_status(
+    user_id: int,
+    request: AdminUpdateRequest,
+    db: Session = Depends(get_db),
+    current_admin: models.User = Depends(get_admin_user)
+):
+    user = db.query(models.User).filter(models.User.id == user_id, models.User.is_active == True).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Identity not found")
+
+    # Safety Check: Prevent the admin from revoking their own access
+    if user.id == current_admin.id and not request.is_admin:
+        raise HTTPException(status_code=400, detail="Protocol Violation: You cannot revoke your own OMEGA CLEARANCE.")
+
+    user.is_admin = request.is_admin
+    db.commit()
+    
+    status_msg = "granted OMEGA CLEARANCE" if request.is_admin else "stripped of OMEGA CLEARANCE"
+    return {"status": "success", "message": f"Identity {status_msg}."}
+
 @router.put("/{user_id}/wallet")
 def update_user_wallet(
     user_id: int,
@@ -84,8 +130,14 @@ def update_user_wallet(
     admin: models.User = Depends(get_admin_user)
 ):
     user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user or not user.wallet:
-        raise HTTPException(status_code=404, detail="User or wallet system offline or missing")
+    if not user:
+        raise HTTPException(status_code=404, detail="Identity not found")
+        
+    # Auto-create wallet if missing
+    if not user.wallet:
+        new_wallet = models.Wallet(user_id=user.id, balance_hours=0.0)
+        db.add(new_wallet)
+        db.flush() 
         
     user.wallet.balance_hours += request.hours_added
     
@@ -126,9 +178,7 @@ def ban_user(
     ).all()
     
     for instance in active_instances:
-        # Mark as destroying in DB
         instance.status = models.InstanceStatus.DESTROYING
-        # Trigger the correctly named background task
         background_tasks.add_task(destroy_node_logic, instance.id)
         
     db.commit()
@@ -149,7 +199,6 @@ def delete_user(
     # Soft delete
     user.is_active = False
     
-    # Safely clear their active streams via background task
     active_instances = db.query(models.Instance).filter(
         models.Instance.user_id == user.id,
         models.Instance.status.in_([
@@ -161,7 +210,6 @@ def delete_user(
     
     for instance in active_instances:
         instance.status = models.InstanceStatus.DESTROYING
-        # Ensure instances are actually purged from Proxmox logic
         background_tasks.add_task(destroy_node_logic, instance.id)
     
     db.commit()

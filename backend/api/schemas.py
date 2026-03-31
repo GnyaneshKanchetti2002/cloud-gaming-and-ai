@@ -1,20 +1,17 @@
 # backend/api/schemas.py
-
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from datetime import datetime
-# Ensure these are imported correctly from your local models file
 from .models import InstanceStatus, UserRole
 
 # --- User Schemas ---
-
 class UserBase(BaseModel):
-    email: EmailStr # Changed to EmailStr for better validation if using pydantic[email]
-    role: UserRole  # This will return 'B2B' or 'B2C' as defined in your Enum
+    email: EmailStr
+    role: UserRole
 
 class UserCreate(UserBase):
     password: Optional[str] = None
-    username: Optional[str] = None # Added for Discord/Display name support
+    username: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -32,8 +29,8 @@ class TokenData(BaseModel):
 
 class UserResponse(UserBase):
     id: int
-    username: Optional[str] = None # Helpful for displaying "Welcome, Aryan"
-    moonlight_pin: Optional[str] = None # Changed to str as PINs can have leading zeros
+    username: Optional[str] = None
+    moonlight_pin: Optional[str] = None
     is_admin: bool
     is_active: bool
     is_banned: bool
@@ -42,7 +39,6 @@ class UserResponse(UserBase):
         from_attributes = True
 
 # --- Instance Schemas ---
-
 class InstanceBase(BaseModel):
     vram_allocation: int
     os_template: str
@@ -60,12 +56,14 @@ class InstanceResponse(InstanceBase):
     physical_node: Optional[str] = None
     vlan_id: Optional[int] = None
     status: InstanceStatus
+    
+    # NEW: Added so frontend can verify sync
+    session_start_time: Optional[datetime] = None
 
     class Config:
         from_attributes = True
 
 # --- Telemetry Schemas ---
-
 class SessionTelemetryBase(BaseModel):
     instance_id: int
 
@@ -81,7 +79,6 @@ class SessionTelemetryResponse(SessionTelemetryBase):
         from_attributes = True
 
 # --- Wallet Schemas ---
-
 class WalletTransactionResponse(BaseModel):
     id: int
     user_id: int

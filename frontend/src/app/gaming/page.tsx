@@ -15,6 +15,11 @@ export default function GamingDashboard() {
   const [instances, setInstances] = useState<InstanceRecord[]>([]);
   const [launchingGame, setLaunchingGame] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  
+  // Wallet State
+  const [walletSeconds, setWalletSeconds] = useState<number>(0);
+  const [isWalletLoaded, setIsWalletLoaded] = useState(false);
+
   const router = useRouter();
 
   const getAuthHeaders = () => {
@@ -37,6 +42,25 @@ export default function GamingDashboard() {
       }
     } catch (e) {
       console.error("Failed to fetch instances", e);
+    }
+  };
+
+  // Fetch Wallet Balance
+  const fetchWallet = async (userId: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/wallet/${userId}`, { 
+        headers: getAuthHeaders(),
+        credentials: 'include' 
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // FIXED: Now correctly targeting balance_hours from the JSON response
+        const totalSeconds = Math.floor((data.balance_hours || 0) * 3600);
+        setWalletSeconds(totalSeconds);
+        setIsWalletLoaded(true);
+      }
+    } catch (e) {
+      console.error("Failed to fetch wallet", e);
     }
   };
 
@@ -63,7 +87,11 @@ export default function GamingDashboard() {
         
         const activeUser = await res.json();
         setUser(activeUser);
+        
+        // Fetch both instances and wallet on load
         fetchInstances(activeUser.id);
+        fetchWallet(activeUser.id);
+        
       } catch (e) {
         router.push('/login');
       }
@@ -76,6 +104,36 @@ export default function GamingDashboard() {
     }, 5000);
     return () => clearInterval(interval);
   }, [user?.id, router]);
+
+  const activeGame = instances.find(i => i.status !== 'terminated' && i.status !== 'destroying');
+
+  // The Countdown Logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    // Only count down if a game is ACTUALLY running
+    if (activeGame?.status === 'running' && walletSeconds > 0) {
+      interval = setInterval(() => {
+        setWalletSeconds((prev) => Math.max(0, prev - 1));
+      }, 1000);
+    }
+
+    return () => clearInterval(interval);
+  }, [activeGame?.status, walletSeconds]);
+
+  // Helper to format seconds for the UI
+  const formatTime = (totalSeconds: number) => {
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return {
+      hours: h.toString().padStart(2, '0'),
+      minutes: m.toString().padStart(2, '0'),
+      seconds: s.toString().padStart(2, '0')
+    };
+  };
+
+  const time = formatTime(walletSeconds);
 
   const handleLaunch = async (gameTitle: string) => {
     setLaunchingGame(gameTitle);
@@ -118,15 +176,12 @@ export default function GamingDashboard() {
     router.push('/login');
   };
 
-  const activeGame = instances.find(i => i.status !== 'terminated' && i.status !== 'destroying');
-
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-24 px-4 sm:px-6 lg:px-8">
       
       {/* Top Welcome & Digital Wallet */}
       <div className="flex flex-col xl:flex-row gap-8 items-start mt-12">
         <div className="flex-1 space-y-2 relative w-full group">
-          {/* FIXED: Improved Hitbox Disconnect Button */}
           <div className="absolute -top-2 right-0 xl:relative xl:top-0 xl:right-0 xl:flex xl:justify-end mb-4 z-30">
             <button 
               onClick={handleLogout}
@@ -143,22 +198,43 @@ export default function GamingDashboard() {
           <p className="text-zinc-500 font-bold tracking-widest uppercase text-xs">Ready to re-enter the mainframe?</p>
         </div>
 
+        {/* REFINED WALLET UI */}
         <div className="w-full xl:w-auto relative bg-zinc-900/40 backdrop-blur-xl border border-zinc-800 rounded-3xl p-6 overflow-hidden group shadow-xl">
           <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-600/5 to-rose-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
           <div className="absolute -right-40 -top-40 w-80 h-80 bg-fuchsia-500/20 blur-[80px] rounded-full pointer-events-none mix-blend-screen" />
           
           <div className="flex flex-col sm:flex-row items-center justify-between relative z-10 gap-8 h-full">
-            <div>
+            <div className="relative">
               <h3 className="text-zinc-500 font-bold tracking-[0.2em] uppercase text-[10px] mb-2 flex items-center">
-                <Clock className="w-3 h-3 mr-2 text-fuchsia-400" />
-                Wallet Time Remaining
+                <Clock className={`w-3 h-3 mr-2 ${activeGame?.status === 'running' ? 'text-rose-500 animate-pulse' : 'text-fuchsia-400'}`} />
+                {activeGame?.status === 'running' ? 'Draining System Credits' : 'Wallet Time Remaining'}
               </h3>
-              <div className="flex items-baseline space-x-3 font-mono">
-                <span className="text-5xl md:text-6xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-400 drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">
-                  42<span className="text-3xl text-zinc-600 mx-1 animate-pulse">:</span>18
-                </span>
-                <span className="text-lg md:text-xl text-zinc-600 font-bold uppercase tracking-widest">Hrs</span>
+              
+              <div className="flex items-baseline space-x-2 font-mono">
+                {isWalletLoaded ? (
+                  <span className="text-5xl md:text-6xl font-black tracking-tighter text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">
+                    {time.hours}
+                    <span className={`mx-1 ${activeGame?.status === 'running' ? 'text-rose-500 animate-pulse' : 'text-zinc-600'}`}>:</span>
+                    {time.minutes}
+                    <span className={`text-2xl ml-1 ${activeGame?.status === 'running' ? 'text-rose-800' : 'text-zinc-700'}`}>
+                      :{time.seconds}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-4xl font-black tracking-tighter text-zinc-600 flex items-center">
+                     <Loader2 className="w-6 h-6 mr-3 animate-spin" /> Syncing...
+                  </span>
+                )}
+                {isWalletLoaded && <span className="text-lg md:text-xl text-zinc-600 font-bold uppercase tracking-widest">Hrs</span>}
               </div>
+
+              {/* Warning overlay when draining */}
+              {activeGame?.status === 'running' && (
+                <div className="absolute -bottom-6 left-0 text-[9px] text-rose-500 font-black uppercase tracking-widest animate-pulse flex items-center">
+                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-2"></span>
+                   Live Session Active
+                </div>
+              )}
             </div>
             
             <button className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold tracking-wider uppercase text-sm shadow-[0_4px_20px_-5px_rgba(0,0,0,0.5)] border border-zinc-700 hover:border-fuchsia-500/50 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center shrink-0">
@@ -170,7 +246,7 @@ export default function GamingDashboard() {
       </div>
 
       {/* Hero Game (Active Session Tracker) */}
-      <div className="relative h-[60vh] min-h-[400px] max-h-[550px] rounded-[2rem] overflow-hidden group border border-zinc-800/80 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)]">
+      <div className="relative h-[60vh] min-h-[400px] max-h-[550px] rounded-[2rem] overflow-hidden group border border-zinc-800/80 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)] mt-12">
         
         <div className="absolute inset-0 bg-zinc-950 pointer-events-none">
           <div className="w-full h-full bg-[linear-gradient(45deg,#000_25%,transparent_25%),linear-gradient(-45deg,#000_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#000_75%),linear-gradient(-45deg,transparent_75%,#000_75%)] bg-[size:3px_3px] opacity-20 z-10" />
@@ -213,11 +289,11 @@ export default function GamingDashboard() {
           ) : (
             <button 
               onClick={() => handleLaunch("NIGHT CITY EDGE")}
-              disabled={launchingGame !== null}
-              className="w-full md:w-auto px-12 py-6 rounded-2xl bg-yellow-500 text-black font-black text-xl tracking-widest uppercase shadow-[0_0_40px_-10px_rgba(234,179,8,0.8)] border-2 border-yellow-400 group-hover:border-white transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center justify-center shrink-0 hover:bg-yellow-400 relative overflow-hidden group/btn">
+              disabled={launchingGame !== null || (isWalletLoaded && walletSeconds <= 0)}
+              className="w-full md:w-auto px-12 py-6 rounded-2xl bg-yellow-500 text-black font-black text-xl tracking-widest uppercase shadow-[0_0_40px_-10px_rgba(234,179,8,0.8)] border-2 border-yellow-400 group-hover:border-white transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center justify-center shrink-0 hover:bg-yellow-400 relative overflow-hidden group/btn disabled:opacity-50 disabled:cursor-not-allowed">
               <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-[30deg] group-hover/btn:translate-x-[150%] transition-transform duration-700 ease-out pointer-events-none"></div>
               {launchingGame === "NIGHT CITY EDGE" ? <Loader2 className="w-8 h-8 mr-3 animate-spin stroke-black" /> : <Play className="w-8 h-8 mr-3 fill-black" />}
-              {launchingGame === "NIGHT CITY EDGE" ? "Connecting..." : "Launch"}
+              {launchingGame === "NIGHT CITY EDGE" ? "Connecting..." : (walletSeconds <= 0 && isWalletLoaded) ? "Out of Time" : "Launch"}
             </button>
           )}
         </div>
@@ -225,7 +301,7 @@ export default function GamingDashboard() {
 
       {/* Library Grid Area */}
       <div>
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 mt-12">
           <h2 className="text-xl md:text-2xl font-black italic tracking-widest text-white flex items-center uppercase">
             <span className="w-1.5 h-8 bg-gradient-to-b from-fuchsia-500 to-rose-500 mr-4 shadow-[0_0_10px_rgba(217,70,239,0.8)] skew-x-[-15deg]"></span>
             Ready to Play
@@ -255,7 +331,7 @@ export default function GamingDashboard() {
                   {game.title}
                 </h3>
                 <button 
-                  disabled={activeGame !== undefined}
+                  disabled={activeGame !== undefined || (isWalletLoaded && walletSeconds <= 0)}
                   onClick={() => handleLaunch(game.title)}
                   className={`flex items-center text-xs font-black text-fuchsia-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100 bg-fuchsia-500/10 px-3 py-2 rounded-lg border border-fuchsia-500/30 backdrop-blur w-full justify-center mt-3 hover:bg-fuchsia-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_4px_10px_rgba(0,0,0,0.5)]`}
                 >

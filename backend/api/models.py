@@ -1,4 +1,4 @@
-# backend/api/models.py (Complete)
+# backend/api/models.py
 import enum
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, Enum, DateTime, Boolean
@@ -26,7 +26,7 @@ class User(Base):
     sso_provider = Column(String, nullable=True)
     sso_id = Column(String, unique=True, index=True, nullable=True) 
     hashed_password = Column(String, nullable=True)
-    moonlight_pin = Column(String, nullable=True)         
+    moonlight_pin = Column(String, nullable=True)        
     ssh_public_key = Column(String, nullable=True)
     is_admin = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -53,6 +53,10 @@ class Instance(Base):
     vram_allocation = Column(Integer, nullable=False)
     ip_address = Column(String, nullable=True)
     status = Column(Enum(InstanceStatus), default=InstanceStatus.PENDING, nullable=False)
+    
+    # NEW: Track when the billing clock starts
+    session_start_time = Column(DateTime(timezone=True), nullable=True)
+    
     user = relationship("User", back_populates="instances")
     telemetry = relationship("SessionTelemetry", back_populates="instance", uselist=False)
 
@@ -71,8 +75,8 @@ class WalletTransaction(Base):
     __tablename__ = "wallet_transactions"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    hours_added = Column(Float, nullable=False)
+    admin_id = Column(Integer, ForeignKey("users.id"), nullable=False) # Can be System ID (0) for auto-deductions
+    hours_added = Column(Float, nullable=False) # Can be negative for deductions
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
     reason = Column(String, nullable=True)
     user = relationship("User", foreign_keys=[user_id])

@@ -108,7 +108,7 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
-  // --- FIX: Bulletproof Role Swapping ---
+  // --- Bulletproof Role Swapping ---
   const handleToggleRole = async (id: number, currentRole: string) => {
     const isB2B = currentRole === 'B2B' || currentRole === 'b2b_enterprise';
     const newRole = isB2B ? 'B2C' : 'B2B';
@@ -137,8 +137,33 @@ export default function AdminDashboard() {
     fetchUsers();
   };
 
+  // --- NEW: Handle Admin Toggle ---
+  const handleToggleAdmin = async (id: number, currentStatus: boolean) => {
+    const action = currentStatus ? "REVOKE" : "GRANT";
+    if (!confirm(`DANGER: Are you sure you want to ${action} OMEGA CLEARANCE (Admin) for this identity?`)) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${id}/admin`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ is_admin: !currentStatus }),
+          credentials: "include"
+      });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        alert(`Override Failed: ${errorData.detail}`);
+      }
+      
+      fetchUsers();
+    } catch (error) {
+      console.error("Network failure during clearance override.", error);
+    }
+  };
+
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 pt-8">
+      {/* Top Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-green-900/50 pb-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold uppercase tracking-widest text-green-400 drop-shadow-[0_0_8px_rgba(74,222,128,0.5)]">DATACENTER TELEMETRY</h1>
@@ -155,6 +180,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         {[
           { label: "Active Provision Operations", value: instances.filter(i => i.status === 'provisioning' || i.status === 'pending').length.toString(), unit: "jobs", color: "text-green-400" },
@@ -172,6 +198,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      {/* Heatmap & Terminal Row */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 border border-green-900/50 bg-[#020502] p-6 relative">
           <div className="absolute top-0 right-0 p-2 opacity-30">
@@ -237,7 +264,8 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      <div className="border border-green-900/50 bg-[#020502] shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden">
+      {/* Live Client Sessions */}
+      <div className="border border-green-900/50 bg-[#020502] shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden mt-8">
         <h3 className="text-sm text-green-400 uppercase tracking-widest p-4 border-b border-green-900/30 bg-gradient-to-r from-green-900/20 to-transparent">Live Client Sessions</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs whitespace-nowrap">
@@ -277,6 +305,8 @@ export default function AdminDashboard() {
           </table>
         </div>
       </div>
+      
+      {/* Identities & Access Control */}
       <div className="border border-green-900/50 bg-[#020502] shadow-[0_10px_30px_rgba(0,0,0,0.5)] overflow-hidden mt-8">
         <div className="flex justify-between items-center p-4 border-b border-green-900/30 bg-gradient-to-r from-green-900/20 to-transparent">
           <h3 className="text-sm text-green-400 uppercase tracking-widest">Identities & Access Control</h3>
@@ -301,11 +331,10 @@ export default function AdminDashboard() {
               {users.length === 0 ? (
                 <tr><td colSpan={6} className="p-8 text-center text-green-900 uppercase">No registered identities found on page {userPage}.</td></tr>
               ) : users.map((u, i) => {
-                // FIX: Support formatting for B2B/B2C or old variations
                 const isB2B = u.role === 'B2B' || u.role === 'b2b_enterprise';
                 return (
                 <tr key={i} className="border-b border-green-900/10 hover:bg-green-900/20 transition-colors group">
-                  <td className="p-4 opacity-50">#{u.id} {u.is_admin ? <span className="text-yellow-500 font-bold ml-1">(GOD)</span> : ''}</td>
+                  <td className="p-4 opacity-50">#{u.id} {u.is_admin ? <span className="text-yellow-500 font-bold ml-1">(OMEGA)</span> : ''}</td>
                   <td className="p-4 font-bold text-green-400">{u.email} <span className="text-[10px] text-green-700 ml-2">[{u.sso_provider}]</span></td>
                   <td className={`p-4 font-bold uppercase ${isB2B ? 'text-blue-500' : 'text-purple-500'}`}>{u.role.replace('_', ' ')}</td>
                   <td className="p-4">{u.balance_hours.toFixed(2)} HRS</td>
@@ -313,8 +342,17 @@ export default function AdminDashboard() {
                      {u.is_banned ? <span className="text-red-500 font-black animate-pulse">[BANNED]</span> : u.is_active ? <span className="text-green-600">[ACTIVE]</span> : <span className="text-zinc-500">[PURGED]</span>}
                   </td>
                   <td className="p-4 text-right flex justify-end gap-2">
+                    {/* NEW: Admin Toggle */}
+                    <button 
+                      onClick={() => handleToggleAdmin(u.id, u.is_admin)} 
+                      className={`px-3 py-1 border transition-all text-[10px] uppercase font-bold shadow-sm ${u.is_admin ? 'border-yellow-600/50 text-yellow-500 hover:bg-yellow-900/30' : 'border-green-900 text-green-600 hover:text-white hover:bg-green-900'}`}
+                    >
+                      {u.is_admin ? 'Revoke Omega' : 'Grant Omega'}
+                    </button>
+
                     <button onClick={() => handleToggleRole(u.id, u.role)} className="px-3 py-1 border border-green-900 text-green-600 hover:text-white hover:bg-green-900 transition-colors text-[10px] uppercase font-bold">Swap Role</button>
                     <button onClick={() => handleAddWallet(u.id)} className="px-3 py-1 border border-green-900 text-green-600 hover:text-white hover:bg-green-900 transition-colors text-[10px] uppercase font-bold">Ledger +/-</button>
+                    
                     {!u.is_banned && (
                        <button onClick={() => handleBanUser(u.id)} className="px-3 py-1 border border-red-900 text-red-600 hover:text-white hover:bg-red-900 transition-all text-[10px] uppercase font-bold shadow-[0_0_10px_rgba(239,68,68,0.1)]">Ban</button>
                     )}

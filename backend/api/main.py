@@ -18,7 +18,8 @@ app = FastAPI(
 # IMPORTANT: In Render dashboard, generate a long random string for SECRET_KEY.
 SECRET_KEY = os.getenv("SECRET_KEY", "dev_secret_key_change_in_production")
 
-# Determine if we are in production to set secure cookie flags
+# Render automatically sets the 'RENDER' environment variable to 'true'.
+# We use this to detect if we are deployed to the cloud.
 IS_PROD = os.getenv("RENDER", "false").lower() == "true"
 
 app.add_middleware(
@@ -29,16 +30,20 @@ app.add_middleware(
     same_site="lax"          # Essential for cross-site OAuth redirects
 )
 
-# --- 2. CORS CONFIGURATION ---
+# --- 2. STRICT CORS CONFIGURATION (LOCALHOST KILL) ---
 # Dynamically load the frontend URL from environment variables.
-# We strip trailing slashes to prevent common CORS mismatch errors.
 frontend_url = os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app").rstrip("/")
 
-origins = [
-    "http://localhost:3000",      # Local Next.js default
-    "http://127.0.0.1:3000",      # Local Next.js IP fallback
-    frontend_url,                 # Production Vercel App
-]
+if IS_PROD:
+    # PRODUCTION MODE: Strictly allow only the Vercel domain. Localhost is killed.
+    origins = [frontend_url]
+else:
+    # DEVELOPMENT MODE: Allow localhost for local testing.
+    origins = [
+        "http://localhost:3000",      
+        "http://127.0.0.1:3000",      
+        frontend_url,                 
+    ]
 
 app.add_middleware(
     CORSMiddleware,
