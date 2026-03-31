@@ -1,24 +1,20 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Clock, Zap, Loader2, StopCircle, LogOut } from 'lucide-react';
+import { Play, Clock, Zap, Loader2, StopCircle, LogOut, Wifi, Monitor, Layers } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 
-interface InstanceRecord {
-  id: number;
-  node_name: string;
-  status: string;
-  os_template: string;
-}
-
 export default function GamingDashboard() {
-  const [instances, setInstances] = useState<InstanceRecord[]>([]);
-  const [launchingGame, setLaunchingGame] = useState<string | null>(null);
+  const [instances, setInstances] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
-  
-  // Wallet State
   const [walletSeconds, setWalletSeconds] = useState<number>(0);
   const [isWalletLoaded, setIsWalletLoaded] = useState(false);
+  const [launchingGame, setLaunchingGame] = useState<string | null>(null);
+  
+  // Feature 2: UI States
+  const [heroImage, setHeroImage] = useState("https://images.igdb.com/igdb/image/upload/t_1080p/co2mvt.jpg");
+  const [selectedGame, setSelectedGame] = useState<any>(null);
+  const [showPlatformModal, setShowPlatformModal] = useState(false);
 
   const router = useRouter();
 
@@ -40,12 +36,9 @@ export default function GamingDashboard() {
         const data = await res.json();
         setInstances(data);
       }
-    } catch (e) {
-      console.error("Failed to fetch instances", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
-  // Fetch Wallet Balance
   const fetchWallet = async (userId: number) => {
     try {
       const res = await fetch(`${API_BASE_URL}/users/wallet/${userId}`, { 
@@ -54,51 +47,34 @@ export default function GamingDashboard() {
       });
       if (res.ok) {
         const data = await res.json();
-        // FIXED: Now correctly targeting balance_hours from the JSON response
         const totalSeconds = Math.floor((data.balance_hours || 0) * 3600);
         setWalletSeconds(totalSeconds);
         setIsWalletLoaded(true);
       }
-    } catch (e) {
-      console.error("Failed to fetch wallet", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => {
     const authenticate = async () => {
       const token = localStorage.getItem('token');
-      
-      if (!token) {
-          router.push('/login');
-          return;
-      }
-
+      if (!token) { router.push('/login'); return; }
       try {
         const res = await fetch(`${API_BASE_URL}/auth/me`, { 
           headers: getAuthHeaders(),
           credentials: 'include' 
         });
-        
         if (!res.ok) {
           localStorage.removeItem('token');
           router.push('/login');
           return;
         }
-        
         const activeUser = await res.json();
         setUser(activeUser);
-        
-        // Fetch both instances and wallet on load
         fetchInstances(activeUser.id);
         fetchWallet(activeUser.id);
-        
-      } catch (e) {
-        router.push('/login');
-      }
+      } catch (e) { router.push('/login'); }
     };
-    
     authenticate();
-
     const interval = setInterval(() => {
       if (user?.id) fetchInstances(user.id);
     }, 5000);
@@ -107,21 +83,16 @@ export default function GamingDashboard() {
 
   const activeGame = instances.find(i => i.status !== 'terminated' && i.status !== 'destroying');
 
-  // The Countdown Logic
   useEffect(() => {
     let interval: NodeJS.Timeout;
-
-    // Only count down if a game is ACTUALLY running
     if (activeGame?.status === 'running' && walletSeconds > 0) {
       interval = setInterval(() => {
         setWalletSeconds((prev) => Math.max(0, prev - 1));
       }, 1000);
     }
-
     return () => clearInterval(interval);
   }, [activeGame?.status, walletSeconds]);
 
-  // Helper to format seconds for the UI
   const formatTime = (totalSeconds: number) => {
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
@@ -135,26 +106,30 @@ export default function GamingDashboard() {
 
   const time = formatTime(walletSeconds);
 
-  const handleLaunch = async (gameTitle: string) => {
-    setLaunchingGame(gameTitle);
+  const initiateLaunch = (game: any) => {
+    setSelectedGame(game);
+    setShowPlatformModal(true);
+  };
+
+  const handleLaunch = async (platform: string) => {
+    setShowPlatformModal(false);
+    setLaunchingGame(selectedGame.title);
     try {
       await fetch(`${API_BASE_URL}/proxmox/provision`, {
         method: "POST",
         headers: getAuthHeaders(),
         credentials: "include",
         body: JSON.stringify({
-          node_name: `Gamer-Node-${Math.floor(Math.random() * 1000)}`,
+          node_name: `Cloud-${selectedGame.title.split(' ')[0]}-${Math.floor(Math.random() * 1000)}`,
           vram_allocation: 12,
           os_template: "WINDOWS_11_GAMER",
-          user_id: user?.id
+          user_id: user?.id,
+          launcher: platform // NEW: Passing selected platform to backend
         })
       });
       if (user?.id) fetchInstances(user.id);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setTimeout(() => setLaunchingGame(null), 1000);
-    }
+    } catch (e) { console.error(e); }
+    finally { setTimeout(() => setLaunchingGame(null), 1000); }
   };
 
   const handleKill = async (instanceId: number) => {
@@ -165,182 +140,138 @@ export default function GamingDashboard() {
         credentials: "include"
       });
       if (user?.id) fetchInstances(user.id);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user_role');
-    router.push('/login');
+    } catch (e) { console.error(e); }
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 pb-24 px-4 sm:px-6 lg:px-8">
+    <div className="max-w-7xl mx-auto space-y-12 pb-24 px-4 sm:px-6 lg:px-8 relative">
       
-      {/* Top Welcome & Digital Wallet */}
-      <div className="flex flex-col xl:flex-row gap-8 items-start mt-12">
-        <div className="flex-1 space-y-2 relative w-full group">
-          <div className="absolute -top-2 right-0 xl:relative xl:top-0 xl:right-0 xl:flex xl:justify-end mb-4 z-30">
-            <button 
-              onClick={handleLogout}
-              className="flex items-center px-4 py-2.5 text-[10px] md:text-xs font-black text-zinc-400 hover:text-rose-400 border border-zinc-800/50 hover:border-rose-500/40 bg-zinc-900/40 hover:bg-rose-950/30 rounded-xl transition-all tracking-[0.2em] uppercase group/btn backdrop-blur-sm"
-            >
-              <LogOut className="w-4 h-4 mr-2 transition-transform group-hover/btn:-translate-x-1" /> 
-              <span>Disconnect</span>
-            </button>
+      {/* Platform Selection Modal */}
+      {showPlatformModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,1)] animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-black italic text-white uppercase tracking-widest">Select Platform</h3>
+              <button onClick={() => setShowPlatformModal(false)}><X className="text-zinc-500 hover:text-white" /></button>
+            </div>
+            <div className="grid gap-3">
+              {['Steam', 'Epic Games', 'Battle.net'].map(platform => (
+                <button 
+                  key={platform} 
+                  onClick={() => handleLaunch(platform)}
+                  className="w-full py-4 bg-zinc-800/50 hover:bg-fuchsia-600 rounded-2xl font-bold uppercase tracking-widest transition-all text-xs border border-zinc-800 hover:border-white/20 group flex justify-between px-6 items-center"
+                >
+                  {platform}
+                  <Zap size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              ))}
+            </div>
           </div>
+        </div>
+      )}
 
-          <h1 className="text-4xl md:text-5xl font-black italic tracking-wide text-white drop-shadow-md uppercase">
+      {/* Top Section */}
+      <div className="flex flex-col xl:flex-row gap-8 items-start mt-12">
+        <div className="flex-1 space-y-2 w-full">
+          <h1 className="text-4xl md:text-5xl font-black italic tracking-wide text-white uppercase">
             WELCOME BACK <span className="text-fuchsia-400">{user?.username || 'PLAYER_ONE'}</span>
           </h1>
-          <p className="text-zinc-500 font-bold tracking-widest uppercase text-xs">Ready to re-enter the mainframe?</p>
+          <p className="text-zinc-500 font-bold tracking-widest uppercase text-xs">READY TO RE-ENTER THE MAINFRAME?</p>
         </div>
 
-        {/* REFINED WALLET UI */}
+        {/* WALLET UI */}
         <div className="w-full xl:w-auto relative bg-zinc-900/40 backdrop-blur-xl border border-zinc-800 rounded-3xl p-6 overflow-hidden group shadow-xl">
           <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-600/5 to-rose-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
-          <div className="absolute -right-40 -top-40 w-80 h-80 bg-fuchsia-500/20 blur-[80px] rounded-full pointer-events-none mix-blend-screen" />
-          
           <div className="flex flex-col sm:flex-row items-center justify-between relative z-10 gap-8 h-full">
-            <div className="relative">
+            <div>
               <h3 className="text-zinc-500 font-bold tracking-[0.2em] uppercase text-[10px] mb-2 flex items-center">
                 <Clock className={`w-3 h-3 mr-2 ${activeGame?.status === 'running' ? 'text-rose-500 animate-pulse' : 'text-fuchsia-400'}`} />
                 {activeGame?.status === 'running' ? 'Draining System Credits' : 'Wallet Time Remaining'}
               </h3>
-              
               <div className="flex items-baseline space-x-2 font-mono">
                 {isWalletLoaded ? (
-                  <span className="text-5xl md:text-6xl font-black tracking-tighter text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.1)]">
-                    {time.hours}
-                    <span className={`mx-1 ${activeGame?.status === 'running' ? 'text-rose-500 animate-pulse' : 'text-zinc-600'}`}>:</span>
-                    {time.minutes}
-                    <span className={`text-2xl ml-1 ${activeGame?.status === 'running' ? 'text-rose-800' : 'text-zinc-700'}`}>
-                      :{time.seconds}
-                    </span>
+                  <span className="text-5xl md:text-6xl font-black tracking-tighter text-white">
+                    {time.hours}<span className={`mx-1 ${activeGame?.status === 'running' ? 'text-rose-500 animate-pulse' : 'text-zinc-600'}`}>:</span>
+                    {time.minutes}<span className="text-2xl ml-1 text-zinc-700">:{time.seconds}</span>
                   </span>
-                ) : (
-                  <span className="text-4xl font-black tracking-tighter text-zinc-600 flex items-center">
-                     <Loader2 className="w-6 h-6 mr-3 animate-spin" /> Syncing...
-                  </span>
-                )}
-                {isWalletLoaded && <span className="text-lg md:text-xl text-zinc-600 font-bold uppercase tracking-widest">Hrs</span>}
+                ) : <Loader2 className="animate-spin text-zinc-600" />}
+                {isWalletLoaded && <span className="text-lg text-zinc-600 font-bold uppercase tracking-widest">Hrs</span>}
               </div>
-
-              {/* Warning overlay when draining */}
-              {activeGame?.status === 'running' && (
-                <div className="absolute -bottom-6 left-0 text-[9px] text-rose-500 font-black uppercase tracking-widest animate-pulse flex items-center">
-                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-2"></span>
-                   Live Session Active
-                </div>
-              )}
             </div>
-            
-            <button className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold tracking-wider uppercase text-sm shadow-[0_4px_20px_-5px_rgba(0,0,0,0.5)] border border-zinc-700 hover:border-fuchsia-500/50 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center shrink-0">
-              <Zap className="w-4 h-4 mr-2 text-rose-400 fill-rose-400" />
-              Add Time
+            <button className="px-8 py-4 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold tracking-wider uppercase text-sm border border-zinc-700 transition-all flex items-center">
+              <Zap className="w-4 h-4 mr-2 text-rose-400 fill-rose-400" /> Add Time
             </button>
           </div>
         </div>
       </div>
 
-      {/* Hero Game (Active Session Tracker) */}
-      <div className="relative h-[60vh] min-h-[400px] max-h-[550px] rounded-[2rem] overflow-hidden group border border-zinc-800/80 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)] mt-12">
-        
-        <div className="absolute inset-0 bg-zinc-950 pointer-events-none">
-          <div className="w-full h-full bg-[linear-gradient(45deg,#000_25%,transparent_25%),linear-gradient(-45deg,#000_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#000_75%),linear-gradient(-45deg,transparent_75%,#000_75%)] bg-[size:3px_3px] opacity-20 z-10" />
-          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-10" />
-          
-          <div className={`absolute inset-0 bg-gradient-to-br from-yellow-600/30 via-rose-600/20 to-indigo-600/30 scale-105 transition-transform duration-1000 ${activeGame ? 'animate-pulse' : 'group-hover:scale-100'}`} />
-          <div className="absolute bottom-1/4 left-1/4 w-[600px] h-[600px] bg-yellow-500/10 blur-[120px] rounded-full mix-blend-screen transition-all duration-1000 group-hover:bg-yellow-400/20" />
+      {/* Dynamic Hero Section */}
+      <div className="relative h-[55vh] min-h-[450px] rounded-[3rem] overflow-hidden group border border-zinc-800/80 shadow-2xl">
+        <div 
+          className="absolute inset-0 transition-all duration-1000 ease-in-out scale-105 group-hover:scale-100" 
+          style={{ backgroundImage: `url(${heroImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
+        >
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
         </div>
 
-        <div className="absolute bottom-0 left-0 p-8 md:p-14 z-20 w-full flex flex-col md:flex-row items-end justify-between gap-8">
-          <div className="max-w-2xl transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500 pointer-events-none">
-            {activeGame ? (
-              <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-emerald-500/10 backdrop-blur border border-emerald-500/30 text-emerald-500 text-[10px] font-black tracking-[0.3em] uppercase mb-6 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 mr-2 shadow-[0_0_8px_rgba(16,185,129,1)]"></span>
-                ACTIVE PROXMOX SESSION [{activeGame.status.toUpperCase()}]
-              </div>
-            ) : (
-                <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-yellow-500/10 backdrop-blur border border-yellow-500/30 text-yellow-500 text-[10px] font-black tracking-[0.3em] uppercase mb-6 shadow-[0_0_15px_rgba(234,179,8,0.2)]">
-                  <span className="w-2 h-2 rounded-full bg-yellow-400 mr-2 animate-pulse shadow-[0_0_8px_rgba(234,179,8,1)]"></span>
-                  Last Played
-                </div>
-            )}
-            <h2 className="text-6xl md:text-8xl font-black italic tracking-wide text-transparent bg-clip-text bg-gradient-to-b from-white to-zinc-300 mb-4 drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] filter">
-              {activeGame ? activeGame.node_name.replace('Cloud-', '').replace('-Save', '') : 'NIGHT CITY EDGE'}
+        {/* Live Telemetry Overlay */}
+        <div className="absolute top-8 right-8 flex items-center space-x-4 bg-black/50 backdrop-blur-xl px-5 py-2.5 rounded-full border border-zinc-800/50 z-30">
+          <div className="flex items-center space-x-2 border-r border-zinc-800 pr-4">
+            <Wifi size={14} className="text-emerald-400" />
+            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">14ms Latency</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Monitor size={14} className="text-fuchsia-400" />
+            <span className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.2em]">4K Ultra // 120 FPS</span>
+          </div>
+        </div>
+
+        <div className="absolute bottom-0 left-0 p-12 z-20 w-full flex flex-col md:flex-row items-end justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-6xl md:text-8xl font-black italic tracking-tighter text-white mb-4 drop-shadow-2xl uppercase">
+              {activeGame ? activeGame.node_name.split('-')[1] : selectedGame?.title || 'System Ready'}
             </h2>
-            <p className="text-zinc-300 text-lg/relaxed max-w-lg font-medium tracking-wide drop-shadow-md border-l-2 border-yellow-500 pl-4">
-               {activeGame?.status === 'provisioning' || activeGame?.status === 'pending' ? 'Booting Windows 11 Image. Injecting Moonlight Config...' 
-                : activeGame?.status === 'running' ? 'Server Connected. RTX Overdrive engaged. 0ms Latency pending...'
-                : 'Overdrive termination in progress. Syncing save blobs...'}
+            <p className="text-zinc-300 text-lg font-medium tracking-wide border-l-2 border-fuchsia-500 pl-4 max-w-md">
+               {activeGame?.status === 'running' ? 'Matrix Stabilized. Simulation active.' : 'Select a simulation to initiate neural link.'}
             </p>
           </div>
           
           {activeGame ? (
-             <button 
-             onClick={() => handleKill(activeGame.id)}
-             className="w-full md:w-auto px-12 py-6 rounded-2xl bg-red-900/50 text-red-500 font-black text-xl tracking-widest uppercase shadow-[0_0_40px_-10px_rgba(220,38,38,0.5)] border-2 border-red-500/50 hover:bg-red-600 hover:text-white transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center justify-center shrink-0">
-               <StopCircle className="w-8 h-8 mr-3" />
-               KILL SESSION
-             </button>
+            <button onClick={() => handleKill(activeGame.id)} className="px-12 py-6 rounded-2xl bg-rose-900/50 text-rose-500 font-black text-xl tracking-widest uppercase border-2 border-rose-500/50 hover:bg-rose-600 hover:text-white transition-all">
+              KILL SESSION
+            </button>
           ) : (
             <button 
-              onClick={() => handleLaunch("NIGHT CITY EDGE")}
-              disabled={launchingGame !== null || (isWalletLoaded && walletSeconds <= 0)}
-              className="w-full md:w-auto px-12 py-6 rounded-2xl bg-yellow-500 text-black font-black text-xl tracking-widest uppercase shadow-[0_0_40px_-10px_rgba(234,179,8,0.8)] border-2 border-yellow-400 group-hover:border-white transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center justify-center shrink-0 hover:bg-yellow-400 relative overflow-hidden group/btn disabled:opacity-50 disabled:cursor-not-allowed">
-              <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-[30deg] group-hover/btn:translate-x-[150%] transition-transform duration-700 ease-out pointer-events-none"></div>
-              {launchingGame === "NIGHT CITY EDGE" ? <Loader2 className="w-8 h-8 mr-3 animate-spin stroke-black" /> : <Play className="w-8 h-8 mr-3 fill-black" />}
-              {launchingGame === "NIGHT CITY EDGE" ? "Connecting..." : (walletSeconds <= 0 && isWalletLoaded) ? "Out of Time" : "Launch"}
+              disabled={!selectedGame || walletSeconds <= 0}
+              onClick={() => initiateLaunch(selectedGame)}
+              className="px-12 py-6 rounded-2xl bg-fuchsia-600 text-white font-black text-xl tracking-widest uppercase shadow-[0_0_40px_rgba(217,70,239,0.5)] hover:bg-fuchsia-500 transition-all disabled:opacity-50"
+            >
+              LAUNCH
             </button>
           )}
         </div>
       </div>
 
-      {/* Library Grid Area */}
-      <div>
-        <div className="flex items-center justify-between mb-8 mt-12">
-          <h2 className="text-xl md:text-2xl font-black italic tracking-widest text-white flex items-center uppercase">
-            <span className="w-1.5 h-8 bg-gradient-to-b from-fuchsia-500 to-rose-500 mr-4 shadow-[0_0_10px_rgba(217,70,239,0.8)] skew-x-[-15deg]"></span>
-            Ready to Play
-          </h2>
-          <button className="text-zinc-500 hover:text-white font-black uppercase tracking-widest text-xs transition-colors py-2 px-4 rounded-lg hover:bg-zinc-900 border border-transparent hover:border-zinc-800">Browse Full Catalog</button>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 gap-y-10">
-          {[
-            { title: "Elden Ring", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co4jni.jpg" },
-            { title: "Cyberpunk 2077", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co2mvt.jpg" },
-            { title: "Alan Wake II", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co6ebd.jpg" },
-            { title: "Red Dead Redemption 2", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co1q1f.jpg" },
-            { title: "Starfield", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co6ngy.jpg" }
-          ].map((game, i) => (
-            <div key={i} className="group relative aspect-[2/3] rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800/80 hover:border-zinc-400 transition-all duration-500 shadow-xl hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.8)] hover:-translate-y-2">
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent z-10 opacity-90 group-hover:opacity-70 transition-opacity pointer-events-none" />
-              
-              <div 
-                className={`absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-700 ease-out z-0`}
-                style={{ backgroundImage: `url(${game.img})` }} 
-              />
-              <div className={`absolute inset-0 bg-gradient-to-br ${i%2 === 0 ? 'from-fuchsia-600/20 to-blue-600/10' : 'from-rose-600/20 to-orange-600/10'} mix-blend-overlay z-0 pointer-events-none`} />
-              
-              <div className="absolute bottom-0 left-0 p-5 z-20 w-full transform translate-y-6 group-hover:translate-y-0 transition-transform duration-500 ease-out">
-                <h3 className="text-xl font-bold text-white leading-tight mb-2 tracking-wide border-l-2 border-fuchsia-500 pl-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none">
-                  {game.title}
-                </h3>
-                <button 
-                  disabled={activeGame !== undefined || (isWalletLoaded && walletSeconds <= 0)}
-                  onClick={() => handleLaunch(game.title)}
-                  className={`flex items-center text-xs font-black text-fuchsia-400 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100 bg-fuchsia-500/10 px-3 py-2 rounded-lg border border-fuchsia-500/30 backdrop-blur w-full justify-center mt-3 hover:bg-fuchsia-500 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_4px_10px_rgba(0,0,0,0.5)]`}
-                >
-                  {launchingGame === game.title ? <Loader2 className="w-3 h-3 mr-2 animate-spin stroke-current" /> : <Play className="w-3 h-3 mr-2 fill-current" />} Stream
-                </button>
-              </div>
+      {/* Library Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+        {[
+          { title: "Cyberpunk 2077", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co2mvt.jpg" },
+          { title: "Elden Ring", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co4jni.jpg" },
+          { title: "Alan Wake II", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co6ebd.jpg" },
+          { title: "Starfield", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co6ngy.jpg" },
+          { title: "Red Dead 2", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co1q1f.jpg" }
+        ].map((game, i) => (
+          <div key={i} 
+            onMouseEnter={() => {setHeroImage(game.img); setSelectedGame(game);}}
+            className="group relative aspect-[3/4] rounded-2xl overflow-hidden cursor-pointer border border-zinc-800 transition-all hover:border-fuchsia-500/50 hover:-translate-y-2 shadow-xl"
+          >
+            <img src={game.img} className="absolute inset-0 object-cover w-full h-full grayscale group-hover:grayscale-0 transition-all duration-700" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent" />
+            <div className="absolute bottom-4 left-4">
+              <p className="text-white font-black italic uppercase text-[10px] tracking-widest">{game.title}</p>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
     </div>
   );
