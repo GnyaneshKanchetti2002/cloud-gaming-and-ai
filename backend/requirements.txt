@@ -16,3 +16,4 @@ httpx
 python-multipart
 itsdangerous
 python-dotenv
+requests
