@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Clock, Zap, Loader2, StopCircle, LogOut } from 'lucide-react'; // <-- Added LogOut icon
+import { Play, Clock, Zap, Loader2, StopCircle, LogOut } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 
 interface InstanceRecord {
@@ -112,7 +112,6 @@ export default function GamingDashboard() {
     }
   };
 
-  // --- NEW: Secure Logout Handler ---
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user_role');
@@ -126,19 +125,22 @@ export default function GamingDashboard() {
       
       {/* Top Welcome & Digital Wallet */}
       <div className="flex flex-col xl:flex-row gap-8 items-start mt-12">
-        <div className="flex-1 space-y-2 relative w-full">
-          {/* NEW: Disconnect / Logout Button */}
-          <button 
-            onClick={handleLogout}
-            className="absolute top-0 right-0 xl:static xl:float-right flex items-center px-4 py-2 text-xs font-bold text-zinc-400 hover:text-rose-400 border border-transparent hover:border-rose-900/50 hover:bg-rose-950/20 rounded-lg transition-all tracking-widest uppercase"
-          >
-            <LogOut className="w-4 h-4 mr-2" /> Disconnect
-          </button>
+        <div className="flex-1 space-y-2 relative w-full group">
+          {/* FIXED: Improved Hitbox Disconnect Button */}
+          <div className="absolute -top-2 right-0 xl:relative xl:top-0 xl:right-0 xl:flex xl:justify-end mb-4 z-30">
+            <button 
+              onClick={handleLogout}
+              className="flex items-center px-4 py-2.5 text-[10px] md:text-xs font-black text-zinc-400 hover:text-rose-400 border border-zinc-800/50 hover:border-rose-500/40 bg-zinc-900/40 hover:bg-rose-950/30 rounded-xl transition-all tracking-[0.2em] uppercase group/btn backdrop-blur-sm"
+            >
+              <LogOut className="w-4 h-4 mr-2 transition-transform group-hover/btn:-translate-x-1" /> 
+              <span>Disconnect</span>
+            </button>
+          </div>
 
-          <h1 className="text-4xl font-black italic tracking-wide text-white drop-shadow-md">
+          <h1 className="text-4xl md:text-5xl font-black italic tracking-wide text-white drop-shadow-md uppercase">
             WELCOME BACK <span className="text-fuchsia-400">{user?.username || 'PLAYER_ONE'}</span>
           </h1>
-          <p className="text-zinc-400 font-medium tracking-wide">Ready to re-enter the mainframe?</p>
+          <p className="text-zinc-500 font-bold tracking-widest uppercase text-xs">Ready to re-enter the mainframe?</p>
         </div>
 
         <div className="w-full xl:w-auto relative bg-zinc-900/40 backdrop-blur-xl border border-zinc-800 rounded-3xl p-6 overflow-hidden group shadow-xl">
@@ -168,20 +170,20 @@ export default function GamingDashboard() {
       </div>
 
       {/* Hero Game (Active Session Tracker) */}
-      <div className="relative h-[60vh] min-h-[400px] max-h-[550px] rounded-[2rem] overflow-hidden group cursor-pointer border border-zinc-800/80 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)]">
+      <div className="relative h-[60vh] min-h-[400px] max-h-[550px] rounded-[2rem] overflow-hidden group border border-zinc-800/80 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.7)]">
         
-        <div className="absolute inset-0 bg-zinc-950">
-          <div className="w-full h-full bg-[linear-gradient(45deg,#000_25%,transparent_25%),linear-gradient(-45deg,#000_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#000_75%),linear-gradient(-45deg,transparent_75%,#000_75%)] bg-[size:3px_3px] opacity-20 pointer-events-none mix-blend-overlay z-10" />
+        <div className="absolute inset-0 bg-zinc-950 pointer-events-none">
+          <div className="w-full h-full bg-[linear-gradient(45deg,#000_25%,transparent_25%),linear-gradient(-45deg,#000_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#000_75%),linear-gradient(-45deg,transparent_75%,#000_75%)] bg-[size:3px_3px] opacity-20 z-10" />
           <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-10" />
           
-          <div className={`absolute inset-0 bg-gradient-to-br from-yellow-600/30 via-rose-600/20 to-indigo-600/30 object-cover scale-105 transition-transform duration-1000 ${activeGame ? 'animate-pulse' : 'group-hover:scale-100'}`} />
-          <div className="absolute bottom-1/4 left-1/4 w-[600px] h-[600px] bg-yellow-500/10 blur-[120px] rounded-full mix-blend-screen mix-blend-color-dodge transition-all duration-1000 group-hover:bg-yellow-400/20" />
+          <div className={`absolute inset-0 bg-gradient-to-br from-yellow-600/30 via-rose-600/20 to-indigo-600/30 scale-105 transition-transform duration-1000 ${activeGame ? 'animate-pulse' : 'group-hover:scale-100'}`} />
+          <div className="absolute bottom-1/4 left-1/4 w-[600px] h-[600px] bg-yellow-500/10 blur-[120px] rounded-full mix-blend-screen transition-all duration-1000 group-hover:bg-yellow-400/20" />
         </div>
 
         <div className="absolute bottom-0 left-0 p-8 md:p-14 z-20 w-full flex flex-col md:flex-row items-end justify-between gap-8">
-          <div className="max-w-2xl transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
+          <div className="max-w-2xl transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500 pointer-events-none">
             {activeGame ? (
-             <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-emerald-500/10 backdrop-blur border border-emerald-500/30 text-emerald-500 text-[10px] font-black tracking-[0.3em] uppercase mb-6 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+              <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-emerald-500/10 backdrop-blur border border-emerald-500/30 text-emerald-500 text-[10px] font-black tracking-[0.3em] uppercase mb-6 shadow-[0_0_15px_rgba(16,185,129,0.2)]">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 mr-2 shadow-[0_0_8px_rgba(16,185,129,1)]"></span>
                 ACTIVE PROXMOX SESSION [{activeGame.status.toUpperCase()}]
               </div>
@@ -213,7 +215,7 @@ export default function GamingDashboard() {
               onClick={() => handleLaunch("NIGHT CITY EDGE")}
               disabled={launchingGame !== null}
               className="w-full md:w-auto px-12 py-6 rounded-2xl bg-yellow-500 text-black font-black text-xl tracking-widest uppercase shadow-[0_0_40px_-10px_rgba(234,179,8,0.8)] border-2 border-yellow-400 group-hover:border-white transition-all duration-300 hover:scale-[1.03] active:scale-95 flex items-center justify-center shrink-0 hover:bg-yellow-400 relative overflow-hidden group/btn">
-              <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-[30deg] group-hover/btn:translate-x-[150%] transition-transform duration-700 ease-out"></div>
+              <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-[150%] skew-x-[30deg] group-hover/btn:translate-x-[150%] transition-transform duration-700 ease-out pointer-events-none"></div>
               {launchingGame === "NIGHT CITY EDGE" ? <Loader2 className="w-8 h-8 mr-3 animate-spin stroke-black" /> : <Play className="w-8 h-8 mr-3 fill-black" />}
               {launchingGame === "NIGHT CITY EDGE" ? "Connecting..." : "Launch"}
             </button>
@@ -240,16 +242,16 @@ export default function GamingDashboard() {
             { title: "Starfield", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co6ngy.jpg" }
           ].map((game, i) => (
             <div key={i} className="group relative aspect-[2/3] rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800/80 hover:border-zinc-400 transition-all duration-500 shadow-xl hover:shadow-[0_20px_40px_-5px_rgba(0,0,0,0.8)] hover:-translate-y-2">
-              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent z-10 opacity-90 group-hover:opacity-70 transition-opacity" />
+              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent z-10 opacity-90 group-hover:opacity-70 transition-opacity pointer-events-none" />
               
               <div 
                 className={`absolute inset-0 bg-cover bg-center group-hover:scale-110 transition-transform duration-700 ease-out z-0`}
                 style={{ backgroundImage: `url(${game.img})` }} 
               />
-              <div className={`absolute inset-0 bg-gradient-to-br ${i%2 === 0 ? 'from-fuchsia-600/20 to-blue-600/10' : 'from-rose-600/20 to-orange-600/10'} mix-blend-overlay z-0`} />
+              <div className={`absolute inset-0 bg-gradient-to-br ${i%2 === 0 ? 'from-fuchsia-600/20 to-blue-600/10' : 'from-rose-600/20 to-orange-600/10'} mix-blend-overlay z-0 pointer-events-none`} />
               
               <div className="absolute bottom-0 left-0 p-5 z-20 w-full transform translate-y-6 group-hover:translate-y-0 transition-transform duration-500 ease-out">
-                <h3 className="text-xl font-bold text-white leading-tight mb-2 tracking-wide border-l-2 border-fuchsia-500 pl-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
+                <h3 className="text-xl font-bold text-white leading-tight mb-2 tracking-wide border-l-2 border-fuchsia-500 pl-3 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] pointer-events-none">
                   {game.title}
                 </h3>
                 <button 
