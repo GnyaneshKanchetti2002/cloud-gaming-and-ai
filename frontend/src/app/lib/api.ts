@@ -5,9 +5,6 @@
  * * LOCALHOST KILL LOGIC:
  * In a Vercel production build, it strictly enforces the environment variable.
  * It will only fall back to localhost if you are explicitly running `npm run dev` locally.
- * * IMPORTANT FOR DEPLOYMENT: 
- * Ensure your Vercel Environment Variable includes the /api suffix!
- * Example: https://your-render-app-name.onrender.com/api
  */
 
 const getApiUrl = () => {
@@ -16,8 +13,8 @@ const getApiUrl = () => {
     if (!process.env.NEXT_PUBLIC_API_URL) {
       console.warn("CRITICAL: NEXT_PUBLIC_API_URL is missing in Vercel Environment Variables.");
     }
-    // Return the env var, or a hardcoded fallback to your Render URL just in case
-    return process.env.NEXT_PUBLIC_API_URL || "https://your-backend.onrender.com/api"; 
+    // Return the env var strictly.
+    return process.env.NEXT_PUBLIC_API_URL; 
   }
   
   // If running locally via 'npm run dev', allow the localhost fallback

@@ -6,18 +6,15 @@ from starlette.middleware.sessions import SessionMiddleware
 import os
 
 # --- 1. IMPORT ROUTERS ---
-# Note: Ensure 'games' is imported here after creating the router file
 from api.routers import auth, users, payments, proxmox, games 
 
 # --- 2. INITIALIZE APP ---
-# This MUST happen before adding middleware or including routers
 app = FastAPI(
-    title="Liquid Compute Pool API",
+    title="NEXUS_GP Cloud API",
     description="Backend API for high-performance cloud gaming and AI compute"
 )
 
 # --- 3. SESSION CONFIGURATION (OAUTH) ---
-# Authlib needs this to store OAuth state during the Discord/Azure handshake.
 SECRET_KEY = os.getenv("SECRET_KEY", "dev_secret_key_change_in_production")
 
 # Render automatically sets the 'RENDER' environment variable to 'true'.
@@ -35,10 +32,10 @@ app.add_middleware(
 frontend_url = os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app").rstrip("/")
 
 if IS_PROD:
-    # PRODUCTION MODE: Strictly allow only the Vercel domain. Localhost is killed.
+    # PRODUCTION MODE: Strictly allow only the Vercel domain. Localhost is KILLED.
     origins = [frontend_url]
 else:
-    # DEVELOPMENT MODE: Allow localhost for local testing.
+    # DEVELOPMENT MODE: Allow localhost for local Docker testing.
     origins = [
         "http://localhost:3000",      
         "http://127.0.0.1:3000",      
@@ -54,7 +51,6 @@ app.add_middleware(
 )
 
 # --- 5. INCLUDE ROUTERS ---
-# All routers are included here after the 'app' instance is fully defined
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(payments.router, prefix="/api/payments", tags=["payments"])
@@ -67,7 +63,7 @@ def read_root():
     return {
         "status": "online",
         "environment": "production" if IS_PROD else "development",
-        "message": "Liquid Compute Pool Backend is running smoothly!"
+        "message": "NEXUS_GP Mainframe is active."
     }
 
 @app.get("/health", tags=["system"])
