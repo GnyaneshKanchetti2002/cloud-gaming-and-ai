@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from 'react';
-import { UserCircle, Monitor, Shield, Save } from 'lucide-react';
+import { UserCircle, Monitor, Shield, Save, X } from 'lucide-react';
 
 export default function ConfigPage() {
   const [res, setRes] = useState("4K");

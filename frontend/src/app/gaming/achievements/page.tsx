@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import { Trophy, Star, Target, Timer, Award } from 'lucide-react';
+import { Trophy, Star, Target, Timer, Award, X } from 'lucide-react';
 
 export default function AchievementsPage() {
   const stats = [

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Shield, Zap, Lock } from 'lucide-react';
+import { ArrowLeft, Shield, Zap, Lock, X } from 'lucide-react';
 
 export default function LandingPage() {
   const router = useRouter();

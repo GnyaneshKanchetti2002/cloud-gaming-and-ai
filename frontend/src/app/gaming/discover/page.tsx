@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { Compass, Zap, Flame, Loader2 } from 'lucide-react';
+import { Compass, Zap, Flame, Loader2, X } from 'lucide-react';
 import { API_BASE_URL } from '@/app/lib/api';
 
 export default function DiscoverPage() {

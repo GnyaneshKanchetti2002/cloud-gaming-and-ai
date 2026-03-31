@@ -1,6 +1,6 @@
 "use client";
 import React from 'react';
-import { Wallet, History, CreditCard, ArrowUpRight } from 'lucide-react';
+import { Wallet, History, CreditCard, ArrowUpRight, X } from 'lucide-react';
 
 export default function WalletPage() {
   return (
