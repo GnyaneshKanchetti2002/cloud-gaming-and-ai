@@ -1,9 +1,14 @@
+// frontend/src/app/gaming/page.tsx
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Play, Clock, Zap, Loader2, StopCircle, LogOut, Wifi, Monitor, Layers, X } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 import NodeHealthCard from '@/components/NodeHealthCard';
+
+// NEW IMPORTS
+import { useIdleTimer } from '@/hooks/useIdleTimer';
+import IdleOverlay from '@/components/IdleOverlay';
 
 export default function GamingDashboard() {
   const [instances, setInstances] = useState<any[]>([]);
@@ -15,6 +20,10 @@ export default function GamingDashboard() {
   const [heroImage, setHeroImage] = useState("https://images.igdb.com/igdb/image/upload/t_1080p/co2mvt.jpg");
   const [selectedGame, setSelectedGame] = useState<any>({ title: "Cyberpunk 2077", img: "https://images.igdb.com/igdb/image/upload/t_1080p/co2mvt.jpg" });
   const [showPlatformModal, setShowPlatformModal] = useState(false);
+
+  // IDLE MANAGEMENT STATE
+  const isIdle = useIdleTimer(15); // 15 Minute Timeout
+  const [showIdleWarning, setShowIdleWarning] = useState(false);
 
   const router = useRouter();
 
@@ -70,6 +79,28 @@ export default function GamingDashboard() {
 
   const activeGame = instances.find(i => i.status !== 'terminated' && i.status !== 'destroying');
 
+  // TRIGGER IDLE OVERLAY
+  useEffect(() => {
+    if (isIdle && activeGame?.status === 'running') {
+      setShowIdleWarning(true);
+    } else {
+      setShowIdleWarning(false);
+    }
+  }, [isIdle, activeGame]);
+
+  const handleIdleShutdown = async () => {
+    if (activeGame) {
+      try {
+        await fetch(`${API_BASE_URL}/proxmox/idle-shutdown/${activeGame.id}`, { 
+          method: "POST", 
+          headers: getAuthHeaders() 
+        });
+        fetchInstances(user.id);
+      } catch (e) { console.error(e); }
+    }
+    setShowIdleWarning(false);
+  };
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (activeGame?.status === 'running' && walletSeconds > 0) {
@@ -118,7 +149,15 @@ export default function GamingDashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-24 px-4 sm:px-6 lg:px-8 relative animate-in fade-in duration-700">
       
-      {/* Modal remains the same */}
+      {/* IDLE SENTINEL OVERLAY */}
+      {showIdleWarning && (
+        <IdleOverlay 
+            onAction={() => setShowIdleWarning(false)} 
+            onShutdown={handleIdleShutdown} 
+        />
+      )}
+
+      {/* Platform Launch Modal */}
       {showPlatformModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
           <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] w-full max-w-sm shadow-[0_0_50px_rgba(0,0,0,1)] animate-in zoom-in duration-200">
@@ -137,7 +176,7 @@ export default function GamingDashboard() {
         </div>
       )}
 
-      {/* NEW: TOP SECTION with NODE HEALTH CARD */}
+      {/* TOP SECTION with NODE HEALTH CARD */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-center mt-12">
         <div className="xl:col-span-2 space-y-2">
           <h1 className="text-5xl md:text-7xl font-black italic tracking-tighter text-white uppercase">
@@ -150,7 +189,7 @@ export default function GamingDashboard() {
         </div>
       </div>
 
-      {/* WALLET & HERO SECTION (Simplified layout) */}
+      {/* WALLET & HERO SECTION */}
       <div className="flex flex-col gap-12">
         {/* Wallet Block */}
         <div className="bg-zinc-900/40 backdrop-blur-xl border border-zinc-800 rounded-[2rem] p-8 group shadow-xl">

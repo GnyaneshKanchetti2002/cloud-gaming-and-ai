@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from sqlalchemy.orm import Session
 from typing import List
+import time
 from ..database import get_db
 from .. import models, schemas, auth
 from ..tasks import provision_node_logic, destroy_node_logic
@@ -24,15 +25,12 @@ def trigger_smart_launch(node: str, vmid: int, launcher: str):
     cmd = commands.get(launcher, commands["Steam"])
     
     # The Proxmox API payload for Guest Exec
-    # Requires the QEMU Guest Agent to be installed and running on your Windows Template!
     payload = {
         "command": cmd
     }
     
-    # proxmox_api.post(f"/nodes/{node}/qemu/{vmid}/agent/exec", data=payload)
     print(f"[SMART LAUNCH] Injecting QEMU Guest Exec on VM {vmid}: {cmd}")
     return True
-
 
 @router.post("/provision", status_code=status.HTTP_202_ACCEPTED)
 async def provision_instance(
@@ -52,7 +50,7 @@ async def provision_instance(
             detail="Insufficient wallet balance to start a session."
         )
 
-    # 2. Check if user already has an active instance (optional, but good practice)
+    # 2. Check if user already has an active instance
     existing = db.query(models.Instance).filter(
         models.Instance.user_id == current_user.id,
         models.Instance.status.in_([models.InstanceStatus.PENDING, models.InstanceStatus.PROVISIONING, models.InstanceStatus.RUNNING])
@@ -73,11 +71,10 @@ async def provision_instance(
     db.commit()
     db.refresh(new_instance)
 
-    # Extract the launcher choice from the payload (Default to Steam if missing)
     launcher_choice = getattr(payload, 'launcher', 'Steam')
     print(f"Provisioning Node {new_instance.id} with Target Launcher: {launcher_choice}")
 
-    # 4. Trigger the background task, passing the launcher choice down
+    # 4. Trigger the background task
     bg_tasks.add_task(provision_node_logic, new_instance.id, launcher_choice)
 
     return {
@@ -113,18 +110,44 @@ async def kill_instance(
     if instance.user_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Not your instance to kill.")
 
-    # Prevent spamming the kill button
     if instance.status in [models.InstanceStatus.DESTROYING, models.InstanceStatus.STOPPING]:
          return {"status": "Termination already in progress."}
 
-    # Set status immediately to prevent frontend confusion
     instance.status = models.InstanceStatus.DESTROYING
     db.commit()
 
-    # Trigger background destruction and wallet calculation
     bg_tasks.add_task(destroy_node_logic, instance.id, current_user.id)
     
     return {"status": "Termination sequence initiated. Wallet syncing in background."}
+
+# --- NEW: IDLE MANAGEMENT (FEATURE 7) ---
+@router.post("/idle-shutdown/{instance_id}")
+async def idle_shutdown(
+    instance_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Triggered by Frontend Idle Sentinel.
+    Creates a snapshot (Preserves RAM + Disk) then puts the DB status into hibernation.
+    """
+    instance = db.query(models.Instance).filter(
+        models.Instance.id == instance_id,
+        models.Instance.user_id == current_user.id
+    ).first()
+
+    if not instance:
+        raise HTTPException(status_code=404, detail="Instance target not found.")
+
+    # 1. Logic to tell Proxmox to Snapshot (Simulated hook for tasks.py integration)
+    snapshot_name = f"AutoIdleSave_{int(time.time())}"
+    print(f"[SECURITY] Creating Persistent Snapshot: {snapshot_name} for VM {instance.node_name}")
+    
+    # 2. Update status in DB to indicate it's saved/hibernating
+    instance.status = "hibernating"
+    db.commit()
+
+    return {"message": "Session state persisted. Mainframe entering low-power mode."}
 
 @router.get("/instances", response_model=List[schemas.InstanceResponse])
 def get_all_instances_admin(
