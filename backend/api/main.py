@@ -16,36 +16,28 @@ app = FastAPI(
 
 # --- 3. SESSION CONFIGURATION (OAUTH) ---
 SECRET_KEY = os.getenv("SECRET_KEY", "dev_secret_key_change_in_production")
-
-# Render automatically sets the 'RENDER' environment variable to 'true'.
 IS_PROD = os.getenv("RENDER", "false").lower() == "true"
 
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
-    max_age=3600,            # 1 hour session lifetime
-    https_only=IS_PROD,      # Only send cookies over HTTPS in production
-    same_site="lax"          # Essential for cross-site OAuth redirects
+    max_age=3600,
+    https_only=IS_PROD,
+    same_site="lax"
 )
 
-# --- 4. STRICT CORS CONFIGURATION (LOCALHOST KILL) ---
+# --- 4. STRICT CORS CONFIGURATION ---
 frontend_url = os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app").rstrip("/")
 
 if IS_PROD:
-    # PRODUCTION MODE: Strictly allow only the Vercel domain. Localhost is KILLED.
     origins = [frontend_url]
 else:
-    # DEVELOPMENT MODE: Allow localhost for local Docker testing.
-    origins = [
-        "http://localhost:3000",      
-        "http://127.0.0.1:3000",      
-        frontend_url,                 
-    ]
+    origins = ["http://localhost:3000", "http://127.0.0.1:3000", frontend_url]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,       # Required for HttpOnly cookies and Auth headers
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -65,6 +57,11 @@ def read_root():
         "environment": "production" if IS_PROD else "development",
         "message": "NEXUS_GP Mainframe is active."
     }
+
+@app.get("/api/ping", tags=["system"])
+def ping():
+    """Lightweight endpoint for real-time latency calculation."""
+    return {"status": "pong"}
 
 @app.get("/health", tags=["system"])
 def health_check():
