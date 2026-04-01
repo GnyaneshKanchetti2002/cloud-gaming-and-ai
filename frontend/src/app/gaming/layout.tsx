@@ -22,7 +22,6 @@ export default function GamingLayout({ children }: { children: React.ReactNode }
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // --- LOGOUT LOGIC ---
   const handleDisconnect = () => {
     localStorage.removeItem('token');
     router.push('/');
@@ -30,10 +29,8 @@ export default function GamingLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="flex bg-zinc-950 text-zinc-300 min-h-screen font-sans selection:bg-fuchsia-500/30 overflow-hidden">
-      {/* Floating Search Overlay */}
       <SearchMatrix isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
       
-      {/* Sidebar Navigation */}
       <nav className={`fixed md:relative top-0 left-0 h-screen w-64 md:w-20 lg:w-64 bg-zinc-950 border-r border-zinc-900 flex flex-col py-8 z-40 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="mb-12 px-6 lg:px-8">
            <Link href="/gaming">
@@ -50,19 +47,13 @@ export default function GamingLayout({ children }: { children: React.ReactNode }
         </div>
 
         <div className="mt-auto px-4 space-y-4">
-          {/* Visual indicator for Cmd+K */}
-          <div onClick={() => setIsSearchOpen(true)} className="hidden lg:flex items-center space-x-4 px-4 py-3 rounded-xl bg-zinc-900/50 border border-zinc-800 cursor-pointer hover:border-fuchsia-500/50 transition-all text-zinc-500 group">
+          <div onClick={() => setIsSearchOpen(true)} className="hidden lg:flex items-center space-x-4 px-4 py-3 rounded-xl bg-zinc-900/50 border border-zinc-800 cursor-pointer hover:border-fuchsia-500/50 transition-all group">
             <Search size={18} className="group-hover:text-fuchsia-400" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">Search (⌘K)</span>
           </div>
           
           <NavItem href="/gaming/config" icon={<UserCircle size={22} />} label="Profile Config" active={pathname === '/gaming/config'} />
           
-<<<<<<< HEAD
-          {/* --- NEW: DISCONNECT BUTTON --- */}
-=======
-          {/* --- DISCONNECT BUTTON --- */}
->>>>>>> GammingPageUI/UX
           <button 
             onClick={handleDisconnect}
             className="flex items-center w-full lg:px-4 py-3 lg:space-x-4 rounded-xl transition-all duration-300 text-rose-500/70 hover:bg-rose-500/10 hover:text-rose-500 group"
@@ -72,12 +63,10 @@ export default function GamingLayout({ children }: { children: React.ReactNode }
             </div>
             <span className="text-[11px] font-black tracking-[0.2em] uppercase lg:block hidden">Disconnect</span>
           </button>
-          
         </div>
       </nav>
 
-      {/* Main Content Area */}
-      <main className="flex-1 h-screen overflow-y-auto bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900 via-zinc-950 to-zinc-950">
+      <main className="flex-1 h-screen overflow-y-auto bg-zinc-950">
         <div className="p-4 md:p-8 lg:p-12 xl:px-20 pt-24 md:pt-8 relative z-0">
           {children}
         </div>
