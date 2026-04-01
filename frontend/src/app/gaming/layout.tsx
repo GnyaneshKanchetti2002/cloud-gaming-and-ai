@@ -1,14 +1,15 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Gamepad2, Compass, Wallet, Trophy, UserCircle, Menu, X, Search } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Gamepad2, Compass, Wallet, Trophy, UserCircle, Menu, X, Search, Power } from 'lucide-react';
 import SearchMatrix from '@/components/SearchMatrix';
 
 export default function GamingLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -20,6 +21,12 @@ export default function GamingLayout({ children }: { children: React.ReactNode }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // --- LOGOUT LOGIC ---
+  const handleDisconnect = () => {
+    localStorage.removeItem('token');
+    router.push('/');
+  };
 
   return (
     <div className="flex bg-zinc-950 text-zinc-300 min-h-screen font-sans selection:bg-fuchsia-500/30 overflow-hidden">
@@ -48,7 +55,20 @@ export default function GamingLayout({ children }: { children: React.ReactNode }
             <Search size={18} className="group-hover:text-fuchsia-400" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em]">Search (⌘K)</span>
           </div>
+          
           <NavItem href="/gaming/config" icon={<UserCircle size={22} />} label="Profile Config" active={pathname === '/gaming/config'} />
+          
+          {/* --- DISCONNECT BUTTON --- */}
+          <button 
+            onClick={handleDisconnect}
+            className="flex items-center w-full lg:px-4 py-3 lg:space-x-4 rounded-xl transition-all duration-300 text-rose-500/70 hover:bg-rose-500/10 hover:text-rose-500 group"
+          >
+            <div className="shrink-0 mx-auto lg:mx-0">
+              <Power size={22} className="group-hover:scale-110 transition-transform" />
+            </div>
+            <span className="text-[11px] font-black tracking-[0.2em] uppercase lg:block hidden">Disconnect</span>
+          </button>
+          
         </div>
       </nav>
 

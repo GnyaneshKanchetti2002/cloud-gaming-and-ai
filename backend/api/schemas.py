@@ -46,6 +46,8 @@ class InstanceBase(BaseModel):
 class InstanceCreate(InstanceBase):
     node_name: str
     user_id: int
+    # NEW: Accept the launcher choice from the frontend platform picker
+    launcher: Optional[str] = "Steam" 
 
 class InstanceResponse(InstanceBase):
     id: int

@@ -1,24 +1,23 @@
 // frontend/src/app/lib/api.ts
 
 /**
- * Centralized API Base URL
- * * LOCALHOST KILL LOGIC:
- * In a Vercel production build, it strictly enforces the environment variable.
- * It will only fall back to localhost if you are explicitly running `npm run dev` locally.
+ * PRODUCTION URL KILL LOGIC:
+ * process.env.NEXT_PUBLIC_API_URL must be set in Vercel settings.
  */
+const getApiUrl = (): string => {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
 
-const getApiUrl = () => {
-  // If Vercel is building for production, enforce the live URL
+  // If we are in production (Vercel), enforce the provided environment variable
   if (process.env.NODE_ENV === 'production') {
-    if (!process.env.NEXT_PUBLIC_API_URL) {
-      console.warn("CRITICAL: NEXT_PUBLIC_API_URL is missing in Vercel Environment Variables.");
+    if (!envUrl) {
+      console.error("Vercel Error: NEXT_PUBLIC_API_URL is undefined.");
+      return ""; // Fail gracefully
     }
-    // Return the env var strictly.
-    return process.env.NEXT_PUBLIC_API_URL; 
+    return envUrl;
   }
   
-  // If running locally via 'npm run dev', allow the localhost fallback
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api";
+  // Local development fallback
+  return envUrl || "http://localhost:8000/api";
 };
 
 export const API_BASE_URL = getApiUrl();

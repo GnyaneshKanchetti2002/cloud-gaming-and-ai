@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Clock, Zap, Loader2, StopCircle, LogOut, Wifi, Monitor, Layers } from 'lucide-react';
+import { Play, Clock, Zap, Loader2, StopCircle, LogOut, Wifi, Monitor, Layers, X } from 'lucide-react';
 import { API_BASE_URL } from '../lib/api';
 
 export default function GamingDashboard() {
