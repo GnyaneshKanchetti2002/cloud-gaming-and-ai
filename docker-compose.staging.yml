@@ -1,44 +1,70 @@
 # docker-compose.staging.yml
+version: '3.8'
+
 services:
   # --- Backend API ---
   backend-staging:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    container_name: nexus_backend_staging
     ports:
       - "8000:8000"
     env_file:
       - ./backend/.env.staging
     environment:
-      - DATABASE_URL=sqlite:///./cga_staging.db
+      # Use absolute path inside the container to ensure both backend and celery hit the same file
+      - DATABASE_URL=sqlite:////app/data/cga_staging.db
       - REDIS_URL=redis://redis-staging:6379/0
-    # FIX: Point to api.main:app because main.py is in the api folder
-    command: uvicorn api.main:app --host 0.0.0.0 --port 8000
+      - FRONTEND_URL=http://localhost:3000
+      - DISCORD_REDIRECT_URI=http://localhost:8000/api/auth/callback/discord
+      - SECRET_KEY=liquid_compute_staging_secret_key_99
+    # FIX: Run init_db.py first to ensure all columns exist, then start the server
+    command: bash -c "python init_db.py && uvicorn api.main:app --host 0.0.0.0 --port 8000"
+    volumes:
+      # Maps a local folder to the container so your DB survives restarts
+      - ./backend_data:/app/data
     depends_on:
       - redis-staging
 
   # --- Redis ---
   redis-staging:
     image: redis/redis-stack-server:latest
+    container_name: nexus_redis_staging
     ports:
       - "6379:6379"
 
   # --- Celery Worker ---
-  # --- Celery Worker ---
   worker-staging:
     build:
       context: ./backend
-    # FIX: Point to api.celery_app:celery_app
+      dockerfile: Dockerfile
+    container_name: nexus_worker_staging
     command: celery -A api.celery_app.celery_app worker --loglevel=info 
     env_file:
       - ./backend/.env.staging
-    # backend-staging service section
     environment:
-      - DATABASE_URL=sqlite:///./cga_staging.db
+      - DATABASE_URL=sqlite:////app/data/cga_staging.db
       - REDIS_URL=redis://redis-staging:6379/0
       - FRONTEND_URL=http://localhost:3000
       - DISCORD_REDIRECT_URI=http://localhost:8000/api/auth/callback/discord
-      - SECRET_KEY=liquid_compute_staging_secret_key_99 # Must match .env
+      - SECRET_KEY=liquid_compute_staging_secret_key_99
+    volumes:
+      # CRITICAL: This allows the Celery worker to read/write to the exact same DB as the backend
+      - ./backend_data:/app/data
     depends_on:
       - redis-staging
+      - backend-staging
+
+  # --- Frontend UI ---
+  frontend-staging:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nexus_frontend_staging
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000/api
+    depends_on:
       - backend-staging

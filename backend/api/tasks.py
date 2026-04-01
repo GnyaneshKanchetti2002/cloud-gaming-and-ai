@@ -9,9 +9,33 @@ from .models import Instance, InstanceStatus, Wallet, WalletTransaction
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-def provision_node_logic(instance_id: int):
+# --- PHASE 2: SMART LAUNCH HELPER ---
+def trigger_smart_launch(node: str, vmid: int, launcher: str):
+    """
+    Uses QEMU Guest Agent to auto-start the game platform inside the VM.
+    """
+    commands = {
+        "Steam": "C:\\Program Files (x86)\\Steam\\steam.exe -tenfoot", # Big Picture Mode
+        "Epic Games": "C:\\Program Files (x86)\\Epic Games\\Launcher\\Portal\\Binaries\\Win32\\EpicGamesLauncher.exe",
+        "Battle.net": "C:\\Program Files (x86)\\Battle.net\\Battle.net.exe",
+        "GOG": "C:\\Program Files (x86)\\GOG Galaxy\\GalaxyClient.exe"
+    }
+    
+    cmd = commands.get(launcher, commands["Steam"])
+    
+    # The Proxmox API payload for Guest Exec
+    # Requires the QEMU Guest Agent to be installed and running on your Windows Template!
+    # payload = {"command": cmd}
+    # proxmox_api.post(f"/nodes/{node}/qemu/{vmid}/agent/exec", data=payload)
+    
+    logger.info(f"[SMART LAUNCH] Injecting QEMU Guest Exec on VM {vmid}: {cmd}")
+    return True
+
+
+def provision_node_logic(instance_id: int, launcher: str = "Steam"):
     """
     Handles the heavy lifting of booting the VM and starts the billing clock.
+    Accepts the 'launcher' argument to pass to the Smart Launch system.
     """
     db: Session = SessionLocal()
     try:
@@ -21,9 +45,9 @@ def provision_node_logic(instance_id: int):
 
         instance.status = InstanceStatus.PROVISIONING
         db.commit()
-        logger.info(f"PROVISIONING STARTED: {instance.node_name}")
+        logger.info(f"PROVISIONING STARTED: {instance.node_name} | Target Launcher: {launcher}")
 
-        # Simulate Proxmox Boot
+        # Simulate Proxmox Boot (In production, you'd poll the Proxmox API here)
         time.sleep(15) 
 
         # Finalize, set to Running, and START THE CLOCK
@@ -32,11 +56,15 @@ def provision_node_logic(instance_id: int):
         instance.physical_node = "pve-cluster-node-01"
         instance.proxmox_vmid = 1000 + instance.id
         
-        # NEW: Record exact UTC time the instance became usable
+        # Record exact UTC time the instance became usable
         instance.session_start_time = datetime.now(timezone.utc)
         
         db.commit()
         logger.info(f"PROVISIONING SUCCESS: {instance.node_name} is LIVE. Billing Clock Started.")
+
+        # --- SMART LAUNCH INJECTION ---
+        # Now that the VM is fully booted and responding to the network, inject the launcher command!
+        trigger_smart_launch(instance.physical_node, instance.proxmox_vmid, launcher)
 
     except Exception as e:
         logger.error(f"CRITICAL ERROR in background task: {str(e)}")
@@ -45,6 +73,7 @@ def provision_node_logic(instance_id: int):
             db.commit()
     finally:
         db.close()
+
 
 def destroy_node_logic(instance_id: int, user_id: int):
     """

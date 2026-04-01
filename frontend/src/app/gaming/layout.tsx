@@ -58,7 +58,11 @@ export default function GamingLayout({ children }: { children: React.ReactNode }
           
           <NavItem href="/gaming/config" icon={<UserCircle size={22} />} label="Profile Config" active={pathname === '/gaming/config'} />
           
+<<<<<<< HEAD
           {/* --- NEW: DISCONNECT BUTTON --- */}
+=======
+          {/* --- DISCONNECT BUTTON --- */}
+>>>>>>> GammingPageUI/UX
           <button 
             onClick={handleDisconnect}
             className="flex items-center w-full lg:px-4 py-3 lg:space-x-4 rounded-xl transition-all duration-300 text-rose-500/70 hover:bg-rose-500/10 hover:text-rose-500 group"
