@@ -34,6 +34,8 @@ class UserResponse(UserBase):
     is_admin: bool
     is_active: bool
     is_banned: bool
+    preferred_resolution: Optional[str] = "1080p"
+    target_resolution: Optional[str] = "1080p" # FIX: Exposes the selected tier to the frontend
     
     class Config:
         from_attributes = True

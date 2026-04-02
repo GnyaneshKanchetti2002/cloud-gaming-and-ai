@@ -12,7 +12,6 @@ export default function GamingDashboard() {
   const [instances, setInstances] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   
-  // NEW: Dynamic State
   const [targetResolution, setTargetResolution] = useState("1080p");
   const [walletSeconds, setWalletSeconds] = useState<number>(0);
   const [isWalletLoaded, setIsWalletLoaded] = useState(false);
@@ -142,6 +141,9 @@ export default function GamingDashboard() {
     } catch (e) { console.error(e); }
   };
 
+  // Determine the correct dynamic label for the balance header
+  const tierName = targetResolution === "4K" ? "ULTRA / 4K" : targetResolution === "1440p" ? "AAA / 1440p" : "ESPORTS / 1080p";
+
   return (
     <div className="max-w-7xl mx-auto space-y-12 pb-24 px-4 sm:px-6 lg:px-8 relative animate-in fade-in duration-700">
       
@@ -185,7 +187,7 @@ export default function GamingDashboard() {
             <div>
               <h3 className="text-zinc-500 font-bold tracking-[0.2em] uppercase text-[10px] mb-3 flex items-center">
                 <Clock className={`w-3 h-3 mr-2 ${activeGame?.status === 'running' ? 'text-rose-500 animate-pulse' : 'text-fuchsia-400'}`} />
-                {targetResolution} Balance
+                {tierName} Balance
               </h3>
               <div className="flex items-baseline space-x-2 font-mono">
                 <span className="text-5xl md:text-6xl font-black tracking-tighter text-white">

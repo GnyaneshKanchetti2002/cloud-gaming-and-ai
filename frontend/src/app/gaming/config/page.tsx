@@ -1,9 +1,55 @@
+// frontend/src/app/gaming/config/page.tsx
 "use client";
-import React, { useState } from 'react';
-import { UserCircle, Monitor, Shield, Save, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserCircle, Monitor, Shield, Save, Loader2 } from 'lucide-react';
+import { API_BASE_URL } from '@/app/lib/api';
 
 export default function ConfigPage() {
-  const [res, setRes] = useState("4K");
+  const [res, setRes] = useState("1080p");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const getAuthHeaders = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    return { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
+  };
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/me`, { headers: getAuthHeaders() });
+        if (response.ok) {
+          const user = await response.json();
+          setRes(user.target_resolution || "1080p");
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  const handleSync = async () => {
+    setSaving(true);
+    try {
+      await fetch(`${API_BASE_URL}/users/config`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ target_resolution: res })
+      });
+      // Added a slight delay for better UX feel
+      setTimeout(() => setSaving(false), 600);
+    } catch (e) { 
+      console.error(e); 
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="p-12 flex justify-center"><Loader2 className="animate-spin text-fuchsia-500" size={48} /></div>;
+  }
 
   return (
     <div className="max-w-2xl space-y-12 animate-in fade-in duration-700">
@@ -44,8 +90,13 @@ export default function ConfigPage() {
           />
         </section>
 
-        <button className="w-full py-4 bg-zinc-800 hover:bg-white hover:text-black text-white font-black rounded-xl transition-all flex items-center justify-center uppercase tracking-[0.2em]">
-          <Save className="mr-2" size={18} /> Sync to Mainframe
+        <button 
+          onClick={handleSync}
+          disabled={saving}
+          className="w-full py-4 bg-zinc-800 hover:bg-white hover:text-black text-white font-black rounded-xl transition-all flex items-center justify-center uppercase tracking-[0.2em] disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="mr-2 animate-spin" size={18} /> : <Save className="mr-2" size={18} />}
+          {saving ? "Syncing..." : "Sync to Mainframe"}
         </button>
       </div>
     </div>

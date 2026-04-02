@@ -10,8 +10,8 @@ export default function DiscoverPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   
-  // Tabs State
-  const [activeTab, setActiveTab] = useState<'trending' | 'grossing' | 'new'>('trending');
+  // FIX 2: Includes 'upcoming' and maps perfectly to backend routes
+  const [activeTab, setActiveTab] = useState<'trending' | 'top-rated' | 'new' | 'upcoming'>('trending');
   
   const [searchQuery, setSearchQuery] = useState("");
   const [activeQuery, setActiveQuery] = useState(""); 
@@ -59,16 +59,12 @@ export default function DiscoverPage() {
     else setLoadingMore(true);
 
     try {
-      // Determine the API endpoint based on search vs tab
-      let url = `${API_BASE_URL}/games/trending?offset=${currentOffset}&limit=20`; // Default fallback
+      let url = `${API_BASE_URL}/games/trending?offset=${currentOffset}&limit=20`; 
       
       if (query) {
         url = `${API_BASE_URL}/games/search?q=${query}&offset=${currentOffset}&limit=20`;
       } else {
-        // Map tabs to specific backend logic (assuming your backend /games handles these routes)
-        // If your backend only has /trending right now, you might need to build /grossing and /new endpoints.
-        // For now, we will hit /trending but you can extend this.
-        url = `${API_BASE_URL}/games/${tab === 'trending' ? 'trending' : tab}?offset=${currentOffset}&limit=20`;
+        url = `${API_BASE_URL}/games/${tab}?offset=${currentOffset}&limit=20`;
       }
 
       const res = await fetch(url);
@@ -77,7 +73,12 @@ export default function DiscoverPage() {
         if (data.length === 0) {
           setHasMore(false);
         } else {
-          setGames(prev => isReset ? data : [...prev, ...data]);
+          // GLITCH FIX: Filter out duplicates automatically via Set checking
+          setGames(prev => {
+            if (isReset) return data;
+            const newGames = data.filter((newGame: any) => !prev.some((oldGame: any) => oldGame.id === newGame.id));
+            return [...prev, ...newGames];
+          });
           if (data.length < 20) setHasMore(false);
         }
       }
@@ -106,11 +107,11 @@ export default function DiscoverPage() {
     setActiveQuery(searchQuery);
   };
 
-  const handleTabClick = (tab: 'trending' | 'grossing' | 'new') => {
+  const handleTabClick = (tab: any) => {
     setActiveTab(tab);
     setOffset(0);
     setHasMore(true);
-    setSearchQuery(""); // Clear search when switching tabs
+    setSearchQuery("");
     setActiveQuery("");
   };
 
@@ -131,7 +132,7 @@ export default function DiscoverPage() {
         headers: getAuthHeaders(),
         body: JSON.stringify({
           node_name: nodeName,
-          vram_allocation: 12,
+          vram_allocation: 12, // For discover page quick launch
           os_template: "WINDOWS_11_GAMER",
           user_id: user.id,
           launcher: platform
@@ -180,16 +181,17 @@ export default function DiscoverPage() {
         </form>
       </div>
 
-      {/* FEATURE 5: NAVIGATION TABS */}
+      {/* TABS WITH UPCOMING */}
       <div className="flex gap-6 border-b border-zinc-800/50 pb-px mb-8 overflow-x-auto scrollbar-hide">
         {[
           { id: 'trending', label: 'Top Trending' },
-          { id: 'grossing', label: 'Top Rated' },
-          { id: 'new', label: 'New Releases' }
+          { id: 'top-rated', label: 'Top Rated' },
+          { id: 'new', label: 'New Releases' },
+          { id: 'upcoming', label: 'Upcoming' }
         ].map(tab => (
           <button 
             key={tab.id} 
-            onClick={() => handleTabClick(tab.id as any)}
+            onClick={() => handleTabClick(tab.id)}
             className={`font-black uppercase tracking-[0.15em] text-xs pb-4 border-b-2 transition-all whitespace-nowrap ${
               activeTab === tab.id 
                 ? 'border-fuchsia-500 text-white' 

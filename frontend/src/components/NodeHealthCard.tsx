@@ -1,15 +1,15 @@
 // frontend/src/components/NodeHealthCard.tsx
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Cpu, Activity, Zap, ShieldCheck, Loader2, Globe, Link2 } from 'lucide-react';
+import { Cpu, Activity, Zap, ShieldCheck, Loader2, Link2 } from 'lucide-react';
 import { API_BASE_URL } from '@/app/lib/api';
 
 export default function NodeHealthCard({ resolution = "1080p" }: { resolution?: string }) {
   const [latency, setLatency] = useState<number | null>(null);
   const [status, setStatus] = useState("Scanning Matrix...");
 
-  // FEATURE: Dynamic Compute Hardware based on Config
-  const hardware = resolution === "4K" ? "RTX 4090" : resolution === "1440p" ? "RTX 3080" : "RTX 3060";
+  // FEATURE FIX: Dynamically show Compute Tier Name based on Config
+  const computeTier = resolution === "4K" ? "ULTRA" : resolution === "1440p" ? "AAA" : "ESPORTS";
 
   useEffect(() => {
     const checkLatency = async () => {
@@ -77,16 +77,15 @@ export default function NodeHealthCard({ resolution = "1080p" }: { resolution?: 
             <span className="text-zinc-600 font-bold text-[8px] uppercase tracking-widest block mb-1">Compute</span>
             <div className="flex items-center gap-2">
               <Cpu size={12} className="text-fuchsia-400" />
-              <span className="text-white font-black italic text-base">{hardware}</span>
+              <span className="text-white font-black italic text-base">{computeTier}</span>
             </div>
           </div>
         </div>
 
-        {/* FEATURE 2: CONNECT BUTTON */}
+        {/* CONNECT BUTTON */}
         <button className="w-full py-3 bg-white/5 hover:bg-fuchsia-600 rounded-xl text-white font-black tracking-widest uppercase text-[10px] transition-colors border border-white/10 hover:border-fuchsia-500 flex items-center justify-center gap-2 shadow-lg">
           <Link2 size={14} /> Establish Connection
         </button>
-
       </div>
 
       <div className="relative z-10 pt-2 flex items-center justify-between text-zinc-500 text-[8px] font-bold uppercase tracking-widest border-t border-zinc-800/50 mt-4">
