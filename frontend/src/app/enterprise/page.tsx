@@ -32,7 +32,6 @@ export default function EnterpriseDashboard() {
   const fetchInstances = async (userId: number) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
-      // FIX: Removed the extra /api prefix
       const res = await fetch(`${baseUrl}/proxmox/instances/${userId}`, { 
         headers: getAuthHeaders(),
         credentials: 'include' 
@@ -59,7 +58,6 @@ export default function EnterpriseDashboard() {
       }
 
       try {
-        // FIX: Removed the extra /api prefix here to stop the 404 crash
         const res = await fetch(`${baseUrl}/auth/me`, { 
           headers: getAuthHeaders(),
           credentials: 'include' 
@@ -92,7 +90,6 @@ export default function EnterpriseDashboard() {
     setIsProvisioning(true);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
-      // FIX: Removed the extra /api prefix
       await fetch(`${baseUrl}/proxmox/provision`, {
         method: "POST",
         headers: getAuthHeaders(),
@@ -115,7 +112,6 @@ export default function EnterpriseDashboard() {
   const handleKill = async (instanceId: number) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
-      // FIX: Removed the extra /api prefix
       await fetch(`${baseUrl}/proxmox/kill/${instanceId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
@@ -127,6 +123,7 @@ export default function EnterpriseDashboard() {
     }
   };
 
+  // Dynamic values calculated directly from fetched state
   const activeCount = instances.filter(i => i.status === 'running').length;
   const totalVram = instances.reduce((acc, curr) => acc + curr.vram_allocation, 0);
 

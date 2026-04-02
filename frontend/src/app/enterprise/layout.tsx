@@ -1,10 +1,18 @@
 "use client";
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Database, LayoutDashboard, Settings, HardDrive, Network, Key, Menu, X } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Database, LayoutDashboard, Settings, HardDrive, Network, Key, Menu, X, LogOut } from 'lucide-react';
 
 export default function EnterpriseLayout({ children }: { children: React.ReactNode }) {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    router.push('/login');
+  };
 
   return (
     <div className="flex bg-[#0b1120] text-slate-300 min-h-screen font-sans overflow-hidden">
@@ -45,15 +53,24 @@ export default function EnterpriseLayout({ children }: { children: React.ReactNo
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-hide px-3 space-y-1 mt-4 md:mt-0">
-          <NavItem icon={<LayoutDashboard size={20} />} label="Cluster Nodes" active />
-          <NavItem icon={<Database size={20} />} label="TrueNAS Storage" />
-          <NavItem icon={<HardDrive size={20} />} label="Block Volumes" />
-          <NavItem icon={<Network size={20} />} label="VPC Networks" />
-          <NavItem icon={<Key size={20} />} label="SSH Keys & DCV" />
+          <NavItem href="/enterprise" icon={<LayoutDashboard size={20} />} label="Cluster Nodes" active={pathname === '/enterprise'} />
+          <NavItem href="/enterprise/storage" icon={<Database size={20} />} label="TrueNAS Storage" active={pathname === '/enterprise/storage'} />
+          <NavItem href="/enterprise/volumes" icon={<HardDrive size={20} />} label="Block Volumes" active={pathname === '/enterprise/volumes'} />
+          <NavItem href="/enterprise/vpc" icon={<Network size={20} />} label="VPC Networks" active={pathname === '/enterprise/vpc'} />
+          <NavItem href="/enterprise/ssh-keys" icon={<Key size={20} />} label="SSH Keys & DCV" active={pathname === '/enterprise/ssh-keys'} />
         </div>
 
         <div className="p-4 mt-auto border-t border-slate-800/50">
-          <NavItem icon={<Settings size={20} />} label="Billing Defaults" />
+          <NavItem href="/enterprise/billing" icon={<Settings size={20} />} label="Billing Defaults" active={pathname === '/enterprise/billing'} />
+          
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center space-x-3 px-4 py-3 mt-2 rounded-lg cursor-pointer transition-all duration-200 text-red-400 hover:bg-red-500/10 hover:text-red-300 font-normal"
+          >
+            <LogOut size={20} />
+            <span className="text-sm tracking-wide">Logout</span>
+          </button>
+
           <div className="mt-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
             <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Org Quota</h4>
             <div className="w-full bg-slate-900 rounded-full h-1.5 focus:outline-none shadow-inner">
@@ -78,15 +95,17 @@ export default function EnterpriseLayout({ children }: { children: React.ReactNo
   );
 }
 
-function NavItem({ icon, label, active = false }: { icon: React.ReactNode, label: string, active?: boolean }) {
+function NavItem({ icon, label, href, active = false }: { icon: React.ReactNode, label: string, href: string, active?: boolean }) {
   return (
-    <div className={`flex items-center space-x-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200 ${
-      active 
-      ? 'bg-blue-600/10 text-blue-400 font-medium border border-blue-500/20 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]' 
-      : 'text-slate-400 hover:bg-slate-800 hover:text-white font-normal'
-    }`}>
-      {icon}
-      <span className="text-sm tracking-wide">{label}</span>
-    </div>
+    <Link href={href} className="block">
+      <div className={`flex items-center space-x-3 px-4 py-3 rounded-lg cursor-pointer transition-all duration-200 ${
+        active 
+        ? 'bg-blue-600/10 text-blue-400 font-medium border border-blue-500/20 shadow-[0_0_15px_-3px_rgba(59,130,246,0.3)]' 
+        : 'text-slate-400 hover:bg-slate-800 hover:text-white font-normal'
+      }`}>
+        {icon}
+        <span className="text-sm tracking-wide">{label}</span>
+      </div>
+    </Link>
   );
 }
