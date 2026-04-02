@@ -206,9 +206,15 @@ export default function GamingDashboard() {
                 <span className="text-lg text-zinc-600 font-bold uppercase tracking-widest">Hrs</span>
               </div>
             </div>
-            <button className="px-10 py-5 rounded-2xl bg-zinc-800 hover:bg-fuchsia-600 text-white font-black tracking-widest uppercase text-xs transition-all flex items-center group">
+            
+            {/* UPDATED: Route to Pricing Page */}
+            <button 
+              onClick={() => router.push('/gaming/pricing')} 
+              className="px-10 py-5 rounded-2xl bg-zinc-800 hover:bg-fuchsia-600 text-white font-black tracking-widest uppercase text-xs transition-all flex items-center group"
+            >
               <Zap className="w-4 h-4 mr-2 text-rose-400 group-hover:text-white transition-colors" /> Add System Credits
             </button>
+
           </div>
         </div>
 
