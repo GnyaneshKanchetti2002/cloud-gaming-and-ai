@@ -1,22 +1,23 @@
 # backend/api/main.py
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 import os
 
 # --- 1. IMPORT ROUTERS & DATABASE ---
 from api.routers import auth, users, payments, proxmox, games 
-from api.database import engine, Base # NEW: Imported for DB Reset
+from api.database import engine, Base # Imported for DB Reset
 
 # --- 2. INITIALIZE APP ---
 app = FastAPI(
-    title="NEXUS_GP Cloud API",
+    title="LIQUID COMPUTE API",
     description="Backend API for high-performance cloud gaming and AI compute"
 )
 
 # --- 3. SESSION CONFIGURATION (OAUTH) ---
 SECRET_KEY = os.getenv("SECRET_KEY", "dev_secret_key_change_in_production")
+# Detects if running on Render based on their default environment variable
 IS_PROD = os.getenv("RENDER", "false").lower() == "true"
 
 app.add_middleware(
@@ -24,7 +25,8 @@ app.add_middleware(
     secret_key=SECRET_KEY,
     max_age=3600,
     https_only=IS_PROD,
-    same_site="lax"
+    # MUST be "none" in production so Vercel and Render can share OAuth state cookies
+    same_site="none" if IS_PROD else "lax" 
 )
 
 # --- 4. STRICT CORS CONFIGURATION ---
@@ -33,7 +35,11 @@ frontend_url = os.getenv("FRONTEND_URL", "https://cloud-gaming-and-ai.vercel.app
 if IS_PROD:
     origins = [frontend_url]
 else:
-    origins = ["http://localhost:3000", "http://127.0.0.1:3000", frontend_url]
+    origins = [
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000", 
+        frontend_url
+    ]
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,7 +62,7 @@ def read_root():
     return {
         "status": "online",
         "environment": "production" if IS_PROD else "development",
-        "message": "NEXUS_GP Mainframe is active."
+        "message": "LIQUID COMPUTE Mainframe is active."
     }
 
 @app.get("/api/ping", tags=["system"])
@@ -69,13 +75,19 @@ def health_check():
     """Endpoint for Render/Uptime monitoring"""
     return {"status": "healthy"}
 
-# --- 7. OVERLORD DATABASE RESET (TEMPORARY) ---
+# --- 7. OVERLORD DATABASE RESET (SECURED) ---
 @app.get("/api/dev/reset-db", tags=["system"])
 def reset_database():
     """
-    TEMPORARY ENDPOINT: Wipes the entire Render PostgreSQL database 
-    and perfectly recreates it with the new Tiered Wallet schema.
+    TEMPORARY ENDPOINT: Wipes the entire PostgreSQL database and recreates it.
+    Hard-locked to development mode for safety.
     """
+    if IS_PROD:
+        raise HTTPException(
+            status_code=403, 
+            detail="Critical operation blocked. Database wipe disabled in the production environment."
+        )
+        
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     return {"message": "Matrix wiped. Schema upgraded successfully. You may now log in."}
