@@ -47,13 +47,11 @@ def generate_ssh_keys():
 
 @router.get("/login/discord")
 async def login_discord(request: Request):
-    # DYNAMIC REDIRECT: Uses the BACKEND_URL from environment variables
     redirect_uri = f"{BACKEND_URL}/api/auth/callback/discord"
     return await oauth.discord.authorize_redirect(request, redirect_uri)
 
 @router.get("/login/azure")
 async def login_azure(request: Request):
-    # DYNAMIC REDIRECT: Uses the BACKEND_URL from environment variables
     redirect_uri = f"{BACKEND_URL}/api/auth/callback/azure"
     return await oauth.azure.authorize_redirect(request, redirect_uri)
 
@@ -102,7 +100,9 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
             role=role,
             sso_provider=provider,
             sso_id=sso_id,
-            is_admin=is_overlord  # <--- Grants Admin instantly on creation
+            is_admin=is_overlord,
+            vcore_limit=100, # Initialize default quotas
+            vram_limit=120
         )
         if role == models.UserRole.B2C:
             user.moonlight_pin = generate_moonlight_pin()
@@ -120,8 +120,14 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
             db.refresh(user)
 
     if not user.wallet:
-        # UPDATED: Matches the new Tiered Wallet Schema (Prevents 500 errors)
-        new_wallet = models.Wallet(user_id=user.id, esports_hours=0.0, aaa_hours=0.0, ultra_hours=0.0)
+        # UPDATED: Includes enterprise_balance for B2B billing
+        new_wallet = models.Wallet(
+            user_id=user.id, 
+            esports_hours=0.0, 
+            aaa_hours=0.0, 
+            ultra_hours=0.0,
+            enterprise_balance=0.0 
+        )
         db.add(new_wallet)
         db.commit()
         db.refresh(user)
@@ -154,7 +160,6 @@ def get_me(current_user: models.User = Depends(get_current_user)):
 def logout(request: Request, response: Response):
     token = request.cookies.get("access_token")
     if token:
-        # Safety wrapper in case Redis is completely disabled on free tier
         try:
             if redis_client:
                 redis_client.setex(f"blacklist_jwt:{token}", 86400, "revoked")

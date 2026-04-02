@@ -33,9 +33,14 @@ class User(Base):
     preferred_resolution = Column(String, default="1080p")
     preferred_fps = Column(Integer, default=60)
     sunshine_host_id = Column(String, nullable=True) 
-    target_resolution = Column(String, default="1080p") # NEW: Links to compute tiers (1080p, 1440p, 4K)
+    target_resolution = Column(String, default="1080p") 
     # -----------------------------
     
+    # --- NEW: Enterprise Config Fields ---
+    vcore_limit = Column(Integer, default=100, nullable=False)
+    vram_limit = Column(Integer, default=120, nullable=False)
+    # -----------------------------
+
     ssh_public_key = Column(String, nullable=True)
     is_admin = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -48,10 +53,13 @@ class Wallet(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     
-    # NEW: Tiered Compute Balances
+    # Tiered Compute Balances (B2C)
     esports_hours = Column(Float, default=0.0)
     aaa_hours = Column(Float, default=0.0)
     ultra_hours = Column(Float, default=0.0)
+    
+    # NEW: Enterprise Balance (B2B)
+    enterprise_balance = Column(Float, default=0.0)
     
     user = relationship("User", back_populates="wallet")
 
@@ -94,7 +102,6 @@ class WalletTransaction(Base):
     user = relationship("User", foreign_keys=[user_id])
     admin = relationship("User", foreign_keys=[admin_id])
 
-# NEW: Transaction Ledger
 class Transaction(Base):
     __tablename__ = "transactions"
     id = Column(Integer, primary_key=True, index=True)

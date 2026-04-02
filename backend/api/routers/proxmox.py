@@ -7,6 +7,9 @@ from ..database import get_db
 from .. import models, schemas, auth
 from ..tasks import provision_node_logic, destroy_node_logic
 
+# Import the new proxmox service
+from ..services import proxmox as proxmox_service
+
 router = APIRouter()
 
 # --- PHASE 2: SMART LAUNCH HELPER ---
@@ -157,3 +160,22 @@ def get_all_instances_admin(
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Omega Clearance Required.")
     return db.query(models.Instance).all()
+
+# --- NEW: ENTERPRISE STATS ROUTE ---
+@router.get("/stats", response_model=schemas.EnterpriseStats)
+def get_enterprise_cluster_stats(
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """
+    Fetches aggregated, real-time hypervisor statistics for the Enterprise Dashboard.
+    Admin authorization required.
+    """
+    # Enforce B2B/Admin security check
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Enterprise Dashboard telemetry access denied."
+        )
+    
+    stats = proxmox_service.get_cluster_stats()
+    return stats

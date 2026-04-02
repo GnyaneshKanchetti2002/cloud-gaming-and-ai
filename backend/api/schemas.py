@@ -35,7 +35,7 @@ class UserResponse(UserBase):
     is_active: bool
     is_banned: bool
     preferred_resolution: Optional[str] = "1080p"
-    target_resolution: Optional[str] = "1080p" # FIX: Exposes the selected tier to the frontend
+    target_resolution: Optional[str] = "1080p" 
     
     class Config:
         from_attributes = True
@@ -48,7 +48,6 @@ class InstanceBase(BaseModel):
 class InstanceCreate(InstanceBase):
     node_name: str
     user_id: int
-    # NEW: Accept the launcher choice from the frontend platform picker
     launcher: Optional[str] = "Steam" 
 
 class InstanceResponse(InstanceBase):
@@ -60,8 +59,6 @@ class InstanceResponse(InstanceBase):
     physical_node: Optional[str] = None
     vlan_id: Optional[int] = None
     status: InstanceStatus
-    
-    # NEW: Added so frontend can verify sync
     session_start_time: Optional[datetime] = None
 
     class Config:
@@ -93,3 +90,9 @@ class WalletTransactionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# --- NEW: Enterprise Infrastructure Schemas ---
+class EnterpriseStats(BaseModel):
+    active_instances: int
+    total_vram_gb: float
+    current_hourly_burn: float

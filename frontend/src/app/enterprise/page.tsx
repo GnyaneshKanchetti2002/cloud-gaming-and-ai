@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '../lib/api';
 
 interface InstanceRecord {
   id: number;
@@ -13,8 +14,15 @@ interface InstanceRecord {
   status: string;
 }
 
+interface ClusterStats {
+  active_instances: number;
+  total_vram_gb: number;
+  current_hourly_burn: number;
+}
+
 export default function EnterpriseDashboard() {
   const [instances, setInstances] = useState<InstanceRecord[]>([]);
+  const [clusterStats, setClusterStats] = useState<ClusterStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProvisioning, setIsProvisioning] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -31,8 +39,7 @@ export default function EnterpriseDashboard() {
 
   const fetchInstances = async (userId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
-      const res = await fetch(`${baseUrl}/proxmox/instances/${userId}`, { 
+      const res = await fetch(`${API_BASE_URL}/proxmox/instances/${userId}`, { 
         headers: getAuthHeaders(),
         credentials: 'include' 
       });
@@ -47,9 +54,23 @@ export default function EnterpriseDashboard() {
     }
   };
 
+  const fetchClusterStats = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/proxmox/stats`, { 
+        headers: getAuthHeaders(),
+        credentials: 'include' 
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClusterStats(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch cluster stats", e);
+    }
+  };
+
   useEffect(() => {
     const authenticate = async () => {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
       const token = localStorage.getItem('token');
       
       if (!token) {
@@ -58,13 +79,12 @@ export default function EnterpriseDashboard() {
       }
 
       try {
-        const res = await fetch(`${baseUrl}/auth/me`, { 
+        const res = await fetch(`${API_BASE_URL}/auth/me`, { 
           headers: getAuthHeaders(),
           credentials: 'include' 
         });
         
         if (!res.ok) {
-          // Token is invalid or expired. Destroy it and kick them out.
           localStorage.removeItem('token');
           router.push('/login');
           return;
@@ -73,24 +93,31 @@ export default function EnterpriseDashboard() {
         const activeUser = await res.json();
         setUser(activeUser);
         fetchInstances(activeUser.id);
+        
+        // Fetch global stats if admin
+        if (activeUser.is_admin) {
+          fetchClusterStats();
+        }
       } catch (e) {
         router.push('/login');
       }
     };
     authenticate();
     
-    // Poll hypervisor instances every 5 seconds
+    // Poll hypervisor instances & stats every 5 seconds
     const interval = setInterval(() => {
-      if (user?.id) fetchInstances(user.id);
+      if (user?.id) {
+        fetchInstances(user.id);
+        if (user?.is_admin) fetchClusterStats();
+      }
     }, 5000);
     return () => clearInterval(interval);
-  }, [user?.id, router]);
+  }, [user?.id, user?.is_admin, router]);
 
   const handleProvision = async () => {
     setIsProvisioning(true);
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
-      await fetch(`${baseUrl}/proxmox/provision`, {
+      await fetch(`${API_BASE_URL}/proxmox/provision`, {
         method: "POST",
         headers: getAuthHeaders(),
         credentials: "include",
@@ -102,6 +129,7 @@ export default function EnterpriseDashboard() {
         })
       });
       if (user?.id) fetchInstances(user.id);
+      if (user?.is_admin) fetchClusterStats();
     } catch (e) {
       console.error(e);
     } finally {
@@ -111,21 +139,25 @@ export default function EnterpriseDashboard() {
 
   const handleKill = async (instanceId: number) => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://cloud-gaming-backend.onrender.com/api";
-      await fetch(`${baseUrl}/proxmox/kill/${instanceId}`, {
+      await fetch(`${API_BASE_URL}/proxmox/kill/${instanceId}`, {
         method: "DELETE",
         headers: getAuthHeaders(),
         credentials: "include"
       });
       if (user?.id) fetchInstances(user.id);
+      if (user?.is_admin) fetchClusterStats();
     } catch (e) {
       console.error(e);
     }
   };
 
-  // Dynamic values calculated directly from fetched state
-  const activeCount = instances.filter(i => i.status === 'running').length;
-  const totalVram = instances.reduce((acc, curr) => acc + curr.vram_allocation, 0);
+  // Fallback to local calculations if the global stats API fails or user lacks clearance
+  const localActiveCount = instances.filter(i => i.status === 'running').length;
+  const localTotalVram = instances.reduce((acc, curr) => acc + curr.vram_allocation, 0);
+
+  const displayActiveCount = clusterStats ? clusterStats.active_instances : localActiveCount;
+  const displayTotalVram = clusterStats ? clusterStats.total_vram_gb : localTotalVram;
+  const displayHourlyBurn = clusterStats ? clusterStats.current_hourly_burn : (localTotalVram * 0.15);
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pt-12">
@@ -135,22 +167,22 @@ export default function EnterpriseDashboard() {
         <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-800 rounded-xl p-6 shadow-xl hover:border-slate-700 transition-colors">
           <p className="text-slate-400 text-sm font-semibold tracking-wide uppercase">Active Instances</p>
           <div className="mt-3 flex items-baseline space-x-2">
-            <span className="text-4xl font-bold text-white tracking-tight">{activeCount}</span>
+            <span className="text-4xl font-bold text-white tracking-tight">{displayActiveCount}</span>
             <span className="text-slate-500 text-sm font-medium">/ 10 Limit</span>
           </div>
           <div className="mt-5 w-full bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner">
-            <div className="bg-blue-500 h-2 rounded-r-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${(activeCount / 10) * 100}%` }}></div>
+            <div className="bg-blue-500 h-2 rounded-r-full shadow-[0_0_10px_rgba(59,130,246,0.5)]" style={{ width: `${(displayActiveCount / 10) * 100}%` }}></div>
           </div>
         </div>
         
         <div className="bg-slate-900/80 backdrop-blur-sm border border-slate-800 rounded-xl p-6 shadow-xl hover:border-slate-700 transition-colors">
           <p className="text-slate-400 text-sm font-semibold tracking-wide uppercase">Total vRAM Usage</p>
           <div className="mt-3 flex items-baseline space-x-2">
-            <span className="text-4xl font-bold text-white tracking-tight">{totalVram} GB</span>
+            <span className="text-4xl font-bold text-white tracking-tight">{displayTotalVram} GB</span>
             <span className="text-slate-500 text-sm font-medium">/ 120 GB</span>
           </div>
           <div className="mt-5 w-full bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner">
-            <div className="bg-indigo-500 h-2 rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" style={{ width: `${(totalVram / 120) * 100}%` }}></div>
+            <div className="bg-indigo-500 h-2 rounded-r-full shadow-[0_0_10px_rgba(99,102,241,0.5)]" style={{ width: `${(displayTotalVram / 120) * 100}%` }}></div>
           </div>
         </div>
 
@@ -158,12 +190,12 @@ export default function EnterpriseDashboard() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-[40px] group-hover:bg-emerald-500/20 transition-all duration-500" />
           <p className="text-slate-400 text-sm font-semibold tracking-wide uppercase relative z-10">Current Hourly Burn</p>
           <div className="mt-3 flex items-baseline space-x-2 relative z-10">
-            <span className="text-4xl font-bold text-emerald-400 tracking-tight">${(totalVram * 0.15).toFixed(2)}</span>
+            <span className="text-4xl font-bold text-emerald-400 tracking-tight">${displayHourlyBurn.toFixed(2)}</span>
             <span className="text-slate-500 text-sm font-medium">/ hr</span>
           </div>
           <div className="mt-5 flex items-center justify-between text-xs font-medium text-slate-500 relative z-10">
             <span>Est. monthly</span>
-            <span className="text-slate-300">${(totalVram * 0.15 * 730).toFixed(2)}</span>
+            <span className="text-slate-300">${(displayHourlyBurn * 730).toFixed(2)}</span>
           </div>
         </div>
       </div>
