@@ -1,11 +1,15 @@
+// frontend/src/components/NodeHealthCard.tsx
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Cpu, Activity, Zap, ShieldCheck, Loader2, Globe } from 'lucide-react';
+import { Cpu, Activity, Zap, ShieldCheck, Loader2, Globe, Link2 } from 'lucide-react';
 import { API_BASE_URL } from '@/app/lib/api';
 
-export default function NodeHealthCard() {
+export default function NodeHealthCard({ resolution = "1080p" }: { resolution?: string }) {
   const [latency, setLatency] = useState<number | null>(null);
   const [status, setStatus] = useState("Scanning Matrix...");
+
+  // FEATURE: Dynamic Compute Hardware based on Config
+  const hardware = resolution === "4K" ? "RTX 4090" : resolution === "1440p" ? "RTX 3080" : "RTX 3060";
 
   useEffect(() => {
     const checkLatency = async () => {
@@ -14,7 +18,7 @@ export default function NodeHealthCard() {
         const res = await fetch(`${API_BASE_URL}/ping`);
         if (res.ok) {
           const end = Date.now();
-          setLatency(end - start + 12); // Simulated jitter
+          setLatency(end - start + 12); 
           setStatus("Uplink: RNDR-IAD1");
         }
       } catch (e) {
@@ -30,25 +34,20 @@ export default function NodeHealthCard() {
   return (
     <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group shadow-2xl min-h-[280px] flex flex-col justify-between">
       
-      {/* --- CYBERPUNK NODE MAP BACKGROUND --- */}
+      {/* CYBERPUNK NODE MAP BACKGROUND */}
       <div className="absolute inset-0 opacity-[0.15] grayscale group-hover:opacity-[0.25] transition-opacity duration-700 pointer-events-none">
         <svg viewBox="0 0 800 400" className="w-full h-full object-cover">
-          {/* Simple World Map Path */}
           <path 
             fill="currentColor" 
             className="text-zinc-500"
             d="M150,150 L160,140 L180,145 L200,130 L220,140 L240,160 L230,180 L210,190 L190,210 L170,220 L150,210 L140,180 Z M400,100 L450,90 L500,100 L550,130 L580,180 L550,250 L500,280 L450,270 L400,250 Z M650,250 L700,240 L720,260 L710,290 L680,310 L640,290 Z" 
           />
-          {/* US East Data Center Node (iad1) */}
           <circle cx="215" cy="155" r="4" className="fill-fuchsia-500 animate-ping" />
           <circle cx="215" cy="155" r="2" className="fill-fuchsia-400 shadow-[0_0_10px_#d946ef]" />
-          
-          {/* Scanning Sweep Line */}
           <rect x="0" y="0" width="2" height="400" className="fill-fuchsia-500/20 animate-scan" />
         </svg>
       </div>
 
-      {/* --- CONTENT LAYER --- */}
       <div className="relative z-10 space-y-6">
         <div className="flex justify-between items-start">
           <div>
@@ -66,7 +65,6 @@ export default function NodeHealthCard() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {/* Latency Metric */}
           <div className="bg-black/40 rounded-2xl p-3 border border-white/5 group-hover:border-fuchsia-500/20 transition-all">
             <span className="text-zinc-600 font-bold text-[8px] uppercase tracking-widest block mb-1">Ping</span>
             <div className="flex items-center gap-2">
@@ -75,18 +73,23 @@ export default function NodeHealthCard() {
             </div>
           </div>
 
-          {/* GPU Metric */}
           <div className="bg-black/40 rounded-2xl p-3 border border-white/5 group-hover:border-fuchsia-500/20 transition-all">
             <span className="text-zinc-600 font-bold text-[8px] uppercase tracking-widest block mb-1">Compute</span>
             <div className="flex items-center gap-2">
               <Cpu size={12} className="text-fuchsia-400" />
-              <span className="text-white font-black italic text-base">RTX 3080</span>
+              <span className="text-white font-black italic text-base">{hardware}</span>
             </div>
           </div>
         </div>
+
+        {/* FEATURE 2: CONNECT BUTTON */}
+        <button className="w-full py-3 bg-white/5 hover:bg-fuchsia-600 rounded-xl text-white font-black tracking-widest uppercase text-[10px] transition-colors border border-white/10 hover:border-fuchsia-500 flex items-center justify-center gap-2 shadow-lg">
+          <Link2 size={14} /> Establish Connection
+        </button>
+
       </div>
 
-      <div className="relative z-10 pt-2 flex items-center justify-between text-zinc-500 text-[8px] font-bold uppercase tracking-widest border-t border-zinc-800/50">
+      <div className="relative z-10 pt-2 flex items-center justify-between text-zinc-500 text-[8px] font-bold uppercase tracking-widest border-t border-zinc-800/50 mt-4">
         <div className="flex items-center gap-1.5">
           <ShieldCheck size={10} className="text-fuchsia-500" />
           Secure Tunnel Active

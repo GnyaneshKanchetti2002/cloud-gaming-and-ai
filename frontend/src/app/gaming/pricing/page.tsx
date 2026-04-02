@@ -1,7 +1,8 @@
+// frontend/src/app/gaming/pricing/page.tsx
 "use client";
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Cpu, Zap, Monitor, Loader2, Server, ShieldCheck } from 'lucide-react';
+import { Cpu, Zap, Monitor, Loader2, Server, ShieldCheck, Plus, Minus } from 'lucide-react';
 import { API_BASE_URL } from '@/app/lib/api';
 
 const TIERS = [
@@ -42,13 +43,19 @@ const TIERS = [
 
 export default function PricingPage() {
   const [billingCycle, setBillingCycle] = useState<'hourly' | 'monthly'>('monthly');
+  const [hourlyQty, setHourlyQty] = useState(1);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const router = useRouter();
 
   const handlePayment = async (tier: any) => {
     setProcessingId(tier.id);
     
+    const isHourly = billingCycle === 'hourly';
     const plan = tier[billingCycle];
+    
+    // Calculate final price and hours based on multiplier
+    const finalPrice = isHourly ? plan.price * hourlyQty : plan.price;
+    const finalHours = isHourly ? plan.hours * hourlyQty : plan.hours;
     
     try {
       const token = localStorage.getItem('token');
@@ -59,15 +66,15 @@ export default function PricingPage() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          amount_inr: plan.price,
-          hours_added: plan.hours,
+          amount_inr: finalPrice,
+          hours_added: finalHours,
           tier_name: tier.name,
-          plan_type: billingCycle
+          plan_type: billingCycle,
+          tier_id: tier.id // Needed by backend to route to correct bucket
         })
       });
 
       if (res.ok) {
-        // Redirect to wallet to show the new balance!
         router.push('/gaming/wallet');
       }
     } catch (e) {
@@ -89,8 +96,8 @@ export default function PricingPage() {
         </p>
       </div>
 
-      {/* Billing Toggle */}
-      <div className="flex justify-center mb-12">
+      {/* Billing Toggle & Hourly Quantity */}
+      <div className="flex flex-col items-center gap-6 mb-12">
         <div className="bg-zinc-900/80 p-1.5 rounded-full border border-zinc-800 flex items-center backdrop-blur-xl">
           <button 
             onClick={() => setBillingCycle('hourly')}
@@ -105,6 +112,27 @@ export default function PricingPage() {
             Monthly Pass (30 Hrs)
           </button>
         </div>
+
+        {/* Feature 4: Hourly Multiplier Input */}
+        {billingCycle === 'hourly' && (
+          <div className="flex items-center gap-4 bg-zinc-900 border border-zinc-800 rounded-2xl p-2 animate-in slide-in-from-top-4">
+            <button 
+              onClick={() => setHourlyQty(Math.max(1, hourlyQty - 1))} 
+              className="p-2 hover:bg-zinc-800 rounded-xl text-white transition-colors"
+            >
+              <Minus size={16} />
+            </button>
+            <span className="w-24 text-center text-white font-black uppercase tracking-widest text-sm">
+              {hourlyQty} Hours
+            </span>
+            <button 
+              onClick={() => setHourlyQty(hourlyQty + 1)} 
+              className="p-2 hover:bg-zinc-800 rounded-xl text-white transition-colors"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Pricing Matrix */}
@@ -112,6 +140,9 @@ export default function PricingPage() {
         {TIERS.map((tier) => {
           const isProcessing = processingId === tier.id;
           const currentPlan = tier[billingCycle];
+          
+          // Calculate dynamic price based on cycle and multiplier
+          const finalPrice = billingCycle === 'hourly' ? currentPlan.price * hourlyQty : currentPlan.price;
           
           return (
             <div key={tier.id} className="relative group bg-zinc-900/40 backdrop-blur-xl border border-zinc-800 rounded-3xl p-8 hover:border-zinc-600 transition-all duration-500 flex flex-col justify-between h-full shadow-2xl overflow-hidden">
@@ -123,9 +154,9 @@ export default function PricingPage() {
                   <div className="mb-6">{tier.icon}</div>
                   <h3 className="text-2xl font-black italic text-white uppercase tracking-wider mb-2">{tier.name}</h3>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-4xl font-black text-white tracking-tighter">₹{currentPlan.price}</span>
+                    <span className="text-4xl font-black text-white tracking-tighter">₹{finalPrice}</span>
                     <span className="text-zinc-500 font-bold uppercase tracking-widest text-[10px]">
-                      {billingCycle === 'hourly' ? '/ HOUR' : '/ MONTH'}
+                      Total
                     </span>
                   </div>
                 </div>
@@ -158,7 +189,7 @@ export default function PricingPage() {
                     <Loader2 size={16} className="animate-spin" /> SECURING UPLINK...
                   </span>
                 ) : (
-                  `PAY NOW (₹${currentPlan.price})`
+                  `PAY NOW (₹${finalPrice})`
                 )}
               </button>
             </div>

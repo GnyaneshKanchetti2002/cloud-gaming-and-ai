@@ -1,3 +1,4 @@
+// frontend/src/app/gaming/discover/page.tsx
 "use client";
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -8,6 +9,9 @@ export default function DiscoverPage() {
   const [games, setGames] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  
+  // Tabs State
+  const [activeTab, setActiveTab] = useState<'trending' | 'grossing' | 'new'>('trending');
   
   const [searchQuery, setSearchQuery] = useState("");
   const [activeQuery, setActiveQuery] = useState(""); 
@@ -23,10 +27,7 @@ export default function DiscoverPage() {
 
   const getAuthHeaders = () => {
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    return {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}` 
-    };
+    return { "Content-Type": "application/json", "Authorization": `Bearer ${token}` };
   };
 
   useEffect(() => {
@@ -53,14 +54,22 @@ export default function DiscoverPage() {
     if (node) observer.current.observe(node);
   }, [loading, loadingMore, hasMore]);
 
-  const fetchGamesData = async (currentOffset: number, query: string, isReset: boolean) => {
+  const fetchGamesData = async (currentOffset: number, query: string, tab: string, isReset: boolean) => {
     if (isReset) setLoading(true);
     else setLoadingMore(true);
 
     try {
-      const url = query
-        ? `${API_BASE_URL}/games/search?q=${query}&offset=${currentOffset}&limit=20`
-        : `${API_BASE_URL}/games/trending?offset=${currentOffset}&limit=20`;
+      // Determine the API endpoint based on search vs tab
+      let url = `${API_BASE_URL}/games/trending?offset=${currentOffset}&limit=20`; // Default fallback
+      
+      if (query) {
+        url = `${API_BASE_URL}/games/search?q=${query}&offset=${currentOffset}&limit=20`;
+      } else {
+        // Map tabs to specific backend logic (assuming your backend /games handles these routes)
+        // If your backend only has /trending right now, you might need to build /grossing and /new endpoints.
+        // For now, we will hit /trending but you can extend this.
+        url = `${API_BASE_URL}/games/${tab === 'trending' ? 'trending' : tab}?offset=${currentOffset}&limit=20`;
+      }
 
       const res = await fetch(url);
       if (res.ok) {
@@ -81,12 +90,12 @@ export default function DiscoverPage() {
   };
 
   useEffect(() => {
-    fetchGamesData(0, activeQuery, true);
-  }, [activeQuery]);
+    fetchGamesData(0, activeQuery, activeTab, true);
+  }, [activeQuery, activeTab]);
 
   useEffect(() => {
     if (offset > 0) {
-      fetchGamesData(offset, activeQuery, false);
+      fetchGamesData(offset, activeQuery, activeTab, false);
     }
   }, [offset]);
 
@@ -95,6 +104,14 @@ export default function DiscoverPage() {
     setOffset(0);
     setHasMore(true);
     setActiveQuery(searchQuery);
+  };
+
+  const handleTabClick = (tab: 'trending' | 'grossing' | 'new') => {
+    setActiveTab(tab);
+    setOffset(0);
+    setHasMore(true);
+    setSearchQuery(""); // Clear search when switching tabs
+    setActiveQuery("");
   };
 
   const openLaunchModal = (game: any) => {
@@ -151,7 +168,8 @@ export default function DiscoverPage() {
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
+      {/* HEADER & SEARCH */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
         <div>
           <h1 className="text-4xl md:text-5xl font-black italic tracking-tighter text-white uppercase flex items-center"><Compass className="mr-4 text-fuchsia-500" size={36} />DISCOVERY MATRIX</h1>
           <p className="text-zinc-400 font-bold tracking-[0.2em] text-xs mt-2 uppercase">Live IGDB Feed // Global Node Activity</p>
@@ -160,6 +178,27 @@ export default function DiscoverPage() {
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><Search className="h-5 w-5 text-zinc-500" /></div>
           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="block w-full pl-12 pr-4 py-4 bg-zinc-900/50 border border-zinc-800 rounded-2xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/50 transition-all shadow-inner" placeholder="Search the infinite catalog..." />
         </form>
+      </div>
+
+      {/* FEATURE 5: NAVIGATION TABS */}
+      <div className="flex gap-6 border-b border-zinc-800/50 pb-px mb-8 overflow-x-auto scrollbar-hide">
+        {[
+          { id: 'trending', label: 'Top Trending' },
+          { id: 'grossing', label: 'Top Rated' },
+          { id: 'new', label: 'New Releases' }
+        ].map(tab => (
+          <button 
+            key={tab.id} 
+            onClick={() => handleTabClick(tab.id as any)}
+            className={`font-black uppercase tracking-[0.15em] text-xs pb-4 border-b-2 transition-all whitespace-nowrap ${
+              activeTab === tab.id 
+                ? 'border-fuchsia-500 text-white' 
+                : 'border-transparent text-zinc-600 hover:text-zinc-300'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (

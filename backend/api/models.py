@@ -3,6 +3,7 @@ import enum
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, Enum, DateTime, Boolean
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from .database import Base
 
 class UserRole(str, enum.Enum):
@@ -29,9 +30,10 @@ class User(Base):
     
     # --- Profile Config Fields ---
     moonlight_pin = Column(String, nullable=True)
-    preferred_resolution = Column(String, default="1080p") # "1080p", "1440p", "4K"
-    preferred_fps = Column(Integer, default=60) # 60, 120, 144
+    preferred_resolution = Column(String, default="1080p")
+    preferred_fps = Column(Integer, default=60)
     sunshine_host_id = Column(String, nullable=True) 
+    target_resolution = Column(String, default="1080p") # NEW: Links to compute tiers (1080p, 1440p, 4K)
     # -----------------------------
     
     ssh_public_key = Column(String, nullable=True)
@@ -45,7 +47,12 @@ class Wallet(Base):
     __tablename__ = "wallets"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
-    balance_hours = Column(Float, default=0.0)
+    
+    # NEW: Tiered Compute Balances
+    esports_hours = Column(Float, default=0.0)
+    aaa_hours = Column(Float, default=0.0)
+    ultra_hours = Column(Float, default=0.0)
+    
     user = relationship("User", back_populates="wallet")
 
 class Instance(Base):
@@ -86,3 +93,14 @@ class WalletTransaction(Base):
     reason = Column(String, nullable=True)
     user = relationship("User", foreign_keys=[user_id])
     admin = relationship("User", foreign_keys=[admin_id])
+
+# NEW: Transaction Ledger
+class Transaction(Base):
+    __tablename__ = "transactions"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    title = Column(String)
+    amount = Column(Float)
+    hours = Column(Float)
+    tier = Column(String)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())

@@ -12,6 +12,7 @@ class TopUpRequest(BaseModel):
     hours_added: int
     tier_name: str
     plan_type: str
+    tier_id: str # 'esports', 'aaa', 'ultra'
 
 @router.post("/topup", status_code=status.HTTP_200_OK)
 async def topup_wallet(
@@ -20,29 +21,50 @@ async def topup_wallet(
     current_user: models.User = Depends(auth.get_current_user)
 ):
     """
-    Simulates a payment gateway transaction and adds compute hours to the digital wallet.
+    Simulates a payment gateway transaction, routes compute hours to the correct tier, and logs it.
     """
     # 1. Find or create the user's wallet
     wallet = db.query(models.Wallet).filter(models.Wallet.user_id == current_user.id).first()
     
     if not wallet:
-        wallet = models.Wallet(user_id=current_user.id, balance_hours=0.0)
+        wallet = models.Wallet(user_id=current_user.id, esports_hours=0.0, aaa_hours=0.0, ultra_hours=0.0)
         db.add(wallet)
-        db.commit()
-        db.refresh(wallet)
+        db.flush()
 
-    # 2. Add the purchased hours
-    wallet.balance_hours += req.hours_added
+    # 2. Route the purchased hours to the proper tier bucket
+    if req.tier_id == "esports":
+        wallet.esports_hours += req.hours_added
+    elif req.tier_id == "aaa":
+        wallet.aaa_hours += req.hours_added
+    elif req.tier_id == "ultra":
+        wallet.ultra_hours += req.hours_added
+
+    # 3. Create the Transaction Ledger entry
+    new_tx = models.Transaction(
+        user_id=current_user.id,
+        title=f"Credit Top-up ({req.tier_name})",
+        amount=req.amount_inr,
+        hours=req.hours_added,
+        tier=req.tier_id
+    )
     
-    # Optional: If you have a Transaction History/Ledger table, you would log it here:
-    # new_tx = models.Transaction(user_id=current_user.id, amount=req.amount_inr, hours=req.hours_added, description=f"Top-up: {req.tier_name} ({req.plan_type})")
-    # db.add(new_tx)
-
+    db.add(new_tx)
     db.commit()
     db.refresh(wallet)
 
     return {
         "message": "Payment successful. Compute hours allocated.",
-        "new_balance": wallet.balance_hours,
         "transaction_details": req.dict()
     }
+
+@router.get("/history")
+async def get_history(
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(auth.get_current_user)
+):
+    """Fetches the user's transaction ledger ordered by newest first."""
+    history = db.query(models.Transaction).filter(
+        models.Transaction.user_id == current_user.id
+    ).order_by(models.Transaction.timestamp.desc()).all()
+    
+    return history
