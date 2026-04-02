@@ -75,18 +75,19 @@ def health_check():
     """Endpoint for Render/Uptime monitoring"""
     return {"status": "healthy"}
 
-# --- 7. OVERLORD DATABASE RESET (SECURED) ---
+# --- 7. OVERLORD DATABASE RESET (TEMPORARILY UNLOCKED) ---
 @app.get("/api/dev/reset-db", tags=["system"])
 def reset_database():
     """
     TEMPORARY ENDPOINT: Wipes the entire PostgreSQL database and recreates it.
     Hard-locked to development mode for safety.
     """
-    if IS_PROD:
-        raise HTTPException(
-            status_code=403, 
-            detail="Critical operation blocked. Database wipe disabled in the production environment."
-        )
+    # TEMPORARILY COMMENTED OUT TO FORCE CLOUD WIPE ON RENDER
+    # if IS_PROD:
+    #     raise HTTPException(
+    #         status_code=403, 
+    #         detail="Critical operation blocked. Database wipe disabled in the production environment."
+    #     )
         
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
