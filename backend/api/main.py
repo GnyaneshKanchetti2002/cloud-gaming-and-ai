@@ -83,11 +83,11 @@ def reset_database():
     Hard-locked to development mode for safety.
     """
     # TEMPORARILY COMMENTED OUT TO FORCE CLOUD WIPE ON RENDER
-    # if IS_PROD:
-    #     raise HTTPException(
-    #         status_code=403, 
-    #         detail="Critical operation blocked. Database wipe disabled in the production environment."
-    #     )
+    if IS_PROD:
+        raise HTTPException(
+            status_code=403, 
+            detail="Critical operation blocked. Database wipe disabled in the production environment."
+        )
         
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
