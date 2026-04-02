@@ -1,3 +1,5 @@
+# backend/api/routers/auth.py
+
 import os
 import random
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
@@ -90,6 +92,9 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
 
     user = db.query(models.User).filter((models.User.sso_id == sso_id) | (models.User.email == email)).first()
 
+    # --- AUTO-ADMIN OVERRIDE ---
+    is_overlord = (email == "kan.gnyanesh@gmail.com")
+
     if not user:
         user = models.User(
             email=email,
@@ -97,6 +102,7 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
             role=role,
             sso_provider=provider,
             sso_id=sso_id,
+            is_admin=is_overlord  # <--- Grants Admin instantly on creation
         )
         if role == models.UserRole.B2C:
             user.moonlight_pin = generate_moonlight_pin()
@@ -106,9 +112,16 @@ def process_sso_login(db: Session, response: Response, email: str, username: str
         db.add(user)
         db.commit()
         db.refresh(user)
+    else:
+        # If your user already exists but isn't an admin, this forces the upgrade
+        if is_overlord and not user.is_admin:
+            user.is_admin = True
+            db.commit()
+            db.refresh(user)
 
     if not user.wallet:
-        new_wallet = models.Wallet(user_id=user.id, balance_hours=0.0)
+        # UPDATED: Matches the new Tiered Wallet Schema (Prevents 500 errors)
+        new_wallet = models.Wallet(user_id=user.id, esports_hours=0.0, aaa_hours=0.0, ultra_hours=0.0)
         db.add(new_wallet)
         db.commit()
         db.refresh(user)

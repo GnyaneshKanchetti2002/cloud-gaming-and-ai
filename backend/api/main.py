@@ -5,8 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 import os
 
-# --- 1. IMPORT ROUTERS ---
+# --- 1. IMPORT ROUTERS & DATABASE ---
 from api.routers import auth, users, payments, proxmox, games 
+from api.database import engine, Base # NEW: Imported for DB Reset
 
 # --- 2. INITIALIZE APP ---
 app = FastAPI(
@@ -67,3 +68,14 @@ def ping():
 def health_check():
     """Endpoint for Render/Uptime monitoring"""
     return {"status": "healthy"}
+
+# --- 7. OVERLORD DATABASE RESET (TEMPORARY) ---
+@app.get("/api/dev/reset-db", tags=["system"])
+def reset_database():
+    """
+    TEMPORARY ENDPOINT: Wipes the entire Render PostgreSQL database 
+    and perfectly recreates it with the new Tiered Wallet schema.
+    """
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    return {"message": "Matrix wiped. Schema upgraded successfully. You may now log in."}
