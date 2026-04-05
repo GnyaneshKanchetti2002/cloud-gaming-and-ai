@@ -2,7 +2,7 @@
 'use client'; // Required if using onClick handlers in Next.js App Router
 
 export default function StreamPage() {
-  const streamUrl = "https://desktop-d824dd9.tailb6e984.ts.net"; 
+  const streamUrl = "https://desktop-d824dd9.tailb6e984.ts.net/"; 
 
   const handleLaunch = () => {
     // Opens the stream in a clean, new tab without iframe restrictions
