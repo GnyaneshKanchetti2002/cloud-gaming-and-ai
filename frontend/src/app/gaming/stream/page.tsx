@@ -1,9 +1,8 @@
 // frontend/src/app/gaming/stream/page.tsx
 
 export default function StreamPage() {
-  // Using the direct MagicDNS URL with port 8080 to allow UDP video traffic
-  const streamUrl = "https://desktop-d824dd9.tailb6e984.ts.net:8080"; 
-
+ // It should look exactly like this:
+const streamUrl = "https://desktop-d824dd9.tailb6e984.ts.net";
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black p-4">
       
