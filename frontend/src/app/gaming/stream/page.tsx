@@ -1,7 +1,7 @@
 // frontend/src/app/gaming/stream/page.tsx
 
 export default function StreamPage() {
-  const funnelUrl = "https://tailb6e984.ts.net"; // Replace with your actual Funnel URL
+  const funnelUrl = "https://desktop-d824dd9.tailb6e984.ts.net/"; // Replace with your actual Funnel URL
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black p-4">
