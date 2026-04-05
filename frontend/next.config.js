@@ -4,13 +4,23 @@ const nextConfig = {
     async rewrites() {
         return [
             {
-                // This is the "Fake" path the user sees
                 source: '/api/stream-proxy/:path*',
-                // This is the "Real" secret path only the server knows
                 destination: 'https://desktop-d824dd9.tailb6e984.ts.net/:path*',
             },
         ]
     },
+    // Adding this allows the iframe to load across different security headers
+    async headers() {
+        return [
+            {
+                source: '/api/stream-proxy/:path*',
+                headers: [
+                    { key: 'Access-Control-Allow-Origin', value: '*' },
+                    { key: 'Content-Security-Policy', value: "frame-ancestors 'self' https://cloud-gaming-and-ai.vercel.app" },
+                ],
+            },
+        ]
+    }
 }
 
 module.exports = nextConfig
