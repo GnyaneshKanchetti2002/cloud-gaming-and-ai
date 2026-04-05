@@ -11,6 +11,9 @@ export default function GamingLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const router = useRouter();
 
+  // Check if we are currently in the active game portal
+  const isPlayPage = pathname === '/gaming/play';
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -27,6 +30,16 @@ export default function GamingLayout({ children }: { children: React.ReactNode }
     router.push('/');
   };
 
+  // If we are on the stream page, render ONLY the game (No Sidebar, No Padding)
+  if (isPlayPage) {
+    return (
+      <div className="bg-black min-h-screen w-full overflow-hidden font-sans">
+        {children}
+      </div>
+    );
+  }
+
+  // Otherwise, render the standard dashboard layout
   return (
     <div className="flex bg-zinc-950 text-zinc-300 min-h-screen font-sans selection:bg-fuchsia-500/30 overflow-hidden">
       <SearchMatrix isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />

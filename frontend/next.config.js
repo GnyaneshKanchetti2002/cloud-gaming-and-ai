@@ -9,7 +9,6 @@ const nextConfig = {
             },
         ]
     },
-    // This allows the Iframe to bypass "Same-Origin" security checks
     async headers() {
         return [
             {
@@ -17,7 +16,11 @@ const nextConfig = {
                 headers: [
                     { key: 'Access-Control-Allow-Origin', value: '*' },
                     { key: 'X-Frame-Options', value: 'ALLOWALL' },
-                    { key: 'Content-Security-Policy', value: "frame-ancestors 'self' *" },
+                    { key: 'Content-Security-Policy', value: "frame-ancestors *; frame-src *; default-src * 'unsafe-inline' 'unsafe-eval'; connect-src *;" },
+                    // Cross-Origin Isolation headers (Required for low-latency streaming)
+                    { key: 'Cross-Origin-Resource-Policy', value: 'cross-origin' },
+                    { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
+                    { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
                 ],
             },
         ]
