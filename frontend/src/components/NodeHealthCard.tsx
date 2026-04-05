@@ -1,12 +1,13 @@
-// frontend/src/components/NodeHealthCard.tsx
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Cpu, Activity, Zap, ShieldCheck, Loader2, Link2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { API_BASE_URL } from '@/app/lib/api';
 
 export default function NodeHealthCard({ resolution = "1080p" }: { resolution?: string }) {
   const [latency, setLatency] = useState<number | null>(null);
   const [status, setStatus] = useState("Scanning Matrix...");
+  const router = useRouter();
 
   // FEATURE FIX: Dynamically show Compute Tier Name based on Config
   const computeTier = resolution === "4K" ? "ULTRA" : resolution === "1440p" ? "AAA" : "ESPORTS";
@@ -18,6 +19,7 @@ export default function NodeHealthCard({ resolution = "1080p" }: { resolution?: 
         const res = await fetch(`${API_BASE_URL}/ping`);
         if (res.ok) {
           const end = Date.now();
+          // Adding a small overhead to simulate real-world routing
           setLatency(end - start + 12); 
           setStatus("Uplink: RNDR-IAD1");
         }
@@ -32,7 +34,7 @@ export default function NodeHealthCard({ resolution = "1080p" }: { resolution?: 
   }, []);
 
   return (
-    <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group shadow-2xl min-h-[280px] flex flex-col justify-between">
+    <div className="bg-zinc-900/40 border border-zinc-800 rounded-3xl p-6 backdrop-blur-md relative overflow-hidden group shadow-2xl min-h-[280px] flex flex-col justify-between transition-all hover:border-fuchsia-500/30">
       
       {/* CYBERPUNK NODE MAP BACKGROUND */}
       <div className="absolute inset-0 opacity-[0.15] grayscale group-hover:opacity-[0.25] transition-opacity duration-700 pointer-events-none">
@@ -82,8 +84,11 @@ export default function NodeHealthCard({ resolution = "1080p" }: { resolution?: 
           </div>
         </div>
 
-        {/* CONNECT BUTTON */}
-        <button className="w-full py-3 bg-white/5 hover:bg-fuchsia-600 rounded-xl text-white font-black tracking-widest uppercase text-[10px] transition-colors border border-white/10 hover:border-fuchsia-500 flex items-center justify-center gap-2 shadow-lg">
+        {/* UPDATED CONNECT BUTTON: Navigates to the Stream Pad */}
+        <button 
+          onClick={() => router.push('/gaming/stream')}
+          className="w-full py-3 bg-white/5 hover:bg-fuchsia-600 rounded-xl text-white font-black tracking-widest uppercase text-[10px] transition-all border border-white/10 hover:border-fuchsia-500 flex items-center justify-center gap-2 shadow-lg active:scale-95"
+        >
           <Link2 size={14} /> Establish Connection
         </button>
       </div>
