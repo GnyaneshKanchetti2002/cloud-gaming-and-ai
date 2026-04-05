@@ -9,14 +9,15 @@ const nextConfig = {
             },
         ]
     },
-    // Adding this allows the iframe to load across different security headers
+    // This allows the Iframe to bypass "Same-Origin" security checks
     async headers() {
         return [
             {
                 source: '/api/stream-proxy/:path*',
                 headers: [
                     { key: 'Access-Control-Allow-Origin', value: '*' },
-                    { key: 'Content-Security-Policy', value: "frame-ancestors 'self' https://cloud-gaming-and-ai.vercel.app" },
+                    { key: 'X-Frame-Options', value: 'ALLOWALL' },
+                    { key: 'Content-Security-Policy', value: "frame-ancestors 'self' *" },
                 ],
             },
         ]
