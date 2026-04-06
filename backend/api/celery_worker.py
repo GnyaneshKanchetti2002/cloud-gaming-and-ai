@@ -1,8 +1,9 @@
 import os
 import time
+import requests
 from celery import Celery
 from .database import SessionLocal
-from .models import Instance, InstanceStatus, SessionTelemetry
+from .models import Instance, InstanceStatus, SessionTelemetry, HardwareNode, HardwareStatus
 from datetime import datetime
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -75,5 +76,45 @@ def destroy_node_task(instance_id: int):
         db.commit()
 
         return f"Cleaned up instance {instance_id}"
+    finally:
+        db.close()
+
+@celery_app.task
+def check_ghost_lock(node_id: str, token: str):
+    db = SessionLocal()
+    try:
+        # Check if the token still exists in Redis 
+        # (meaning the frontend generated it but /verify-token never consumed it)
+        from api.auth import redis_client
+        if redis_client and redis_client.exists(f"nexus_token:{token}"):
+            redis_client.delete(f"nexus_token:{token}")
+            
+            node = db.query(HardwareNode).filter(HardwareNode.node_id == node_id).first()
+            if node and node.status == HardwareStatus.IN_USE:
+                node.status = HardwareStatus.AVAILABLE
+                node.current_user_id = None
+                db.commit()
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        db.close()
+
+@celery_app.task
+def terminate_session(node_id: str, user_id: int):
+    db = SessionLocal()
+    try:
+        node = db.query(HardwareNode).filter(HardwareNode.node_id == node_id).first()
+        if node and node.current_user_id == user_id:
+            node.status = HardwareStatus.REBOOTING
+            node.current_user_id = None
+            db.commit()
+            
+            # Hit the Internal API so main.py's in-memory WS tracking handles the Kill switch payload MVP
+            backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+            requests.post(f"{backend_url}/api/internal/kill-node/{node_id}")
+    except Exception as e:
+        db.rollback()
+        raise e
     finally:
         db.close()

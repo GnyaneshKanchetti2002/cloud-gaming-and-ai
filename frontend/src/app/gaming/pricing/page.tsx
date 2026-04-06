@@ -59,7 +59,7 @@ export default function PricingPage() {
     
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${API_BASE_URL}/payments/topup`, {
+      const res = await fetch(`${API_BASE_URL}/payments/create-checkout-session`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -70,12 +70,16 @@ export default function PricingPage() {
           hours_added: finalHours,
           tier_name: tier.name,
           plan_type: billingCycle,
-          tier_id: tier.id // Needed by backend to route to correct bucket
+          tier_id: tier.id
         })
       });
 
       if (res.ok) {
-        router.push('/gaming/wallet');
+        const data = await res.json();
+        window.location.href = data.checkout_url;
+      } else {
+        const err = await res.json();
+        alert(`Stripe Initialization Failed: ${err.detail}`);
       }
     } catch (e) {
       console.error("Payment failed", e);

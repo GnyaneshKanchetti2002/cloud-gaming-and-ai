@@ -18,6 +18,28 @@ class InstanceStatus(str, enum.Enum):
     DESTROYING = "destroying"
     ERROR = "error"
 
+class HardwareTier(str, enum.Enum):
+    ESPORTS = "esports"
+    AAA = "aaa"
+    ULTRA = "ultra"
+    ENTERPRISE = "enterprise"
+
+class HardwareStatus(str, enum.Enum):
+    AVAILABLE = "AVAILABLE"
+    IN_USE = "IN_USE"
+    OFFLINE = "OFFLINE"
+    REBOOTING = "REBOOTING"
+
+class HardwareNode(Base):
+    __tablename__ = "hardware_nodes"
+    id = Column(Integer, primary_key=True, index=True)
+    node_id = Column(String, unique=True, index=True, nullable=False)
+    tailscale_ip = Column(String, nullable=False)
+    tier = Column(Enum(HardwareTier), nullable=False)
+    status = Column(Enum(HardwareStatus), default=HardwareStatus.OFFLINE, nullable=False)
+    last_heartbeat = Column(DateTime(timezone=True), nullable=True)
+    current_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -40,6 +62,8 @@ class User(Base):
     vcore_limit = Column(Integer, default=100, nullable=False)
     vram_limit = Column(Integer, default=120, nullable=False)
     # -----------------------------
+    
+    totp_secret = Column(String, nullable=True)
 
     ssh_public_key = Column(String, nullable=True)
     is_admin = Column(Boolean, default=False, nullable=False)
@@ -88,6 +112,8 @@ class SessionTelemetry(Base):
     end_time = Column(DateTime, nullable=True)
     vram_peak_usage = Column(Float, nullable=True)
     network_ping = Column(Integer, nullable=True)
+    tier_id = Column(String, nullable=True)
+    credits_deducted = Column(Float, nullable=True)
     termination_reason = Column(String, nullable=True)
     instance = relationship("Instance", back_populates="telemetry")
 
@@ -110,4 +136,14 @@ class Transaction(Base):
     amount = Column(Float)
     hours = Column(Float)
     tier = Column(String)
+    stripe_session_id = Column(String, unique=True, index=True, nullable=True)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())
+
+class AdminAuditLog(Base):
+    __tablename__ = "admin_audit_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    admin_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    target_user_id = Column(Integer, nullable=True)
+    action_type = Column(String, nullable=False)
+    reason = Column(String, nullable=True)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())

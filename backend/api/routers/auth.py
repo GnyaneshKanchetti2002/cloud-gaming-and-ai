@@ -2,6 +2,8 @@
 
 import os
 import random
+import secrets
+from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
 from ..database import get_db
@@ -175,3 +177,73 @@ def logout(request: Request, response: Response):
         path="/"
     )
     return {"status": "Enterprise sessions forcefully terminated."}
+
+class NexusLaunchRequest(BaseModel):
+    tier_id: str
+
+@router.post("/generate-nexus-token")
+def generate_nexus_token(
+    request: NexusLaunchRequest, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    if not redis_client:
+        raise HTTPException(status_code=500, detail="Redis connection unavailable.")
+        
+    wallet = db.query(models.Wallet).filter(models.Wallet.user_id == current_user.id).first()
+    if not wallet:
+        raise HTTPException(status_code=400, detail="Wallet not found.")
+        
+    node = db.query(models.HardwareNode).filter(
+        models.HardwareNode.status == models.HardwareStatus.AVAILABLE,
+        models.HardwareNode.tier == request.tier_id.upper()
+    ).first()
+    
+    if not node:
+        raise HTTPException(status_code=503, detail=f"No {request.tier_id.upper()} rigs available. Fleet is at capacity.")
+
+    # Fixed-Block Upfront Deduction logic (MVP)
+    deduction_amount = 1.0 # 1 hour credit
+    
+    if current_user.role == models.UserRole.B2B:
+        if wallet.enterprise_balance < deduction_amount:
+            raise HTTPException(status_code=402, detail="Insufficient Enterprise Balance.")
+        wallet.enterprise_balance -= deduction_amount
+    else:
+        # Check tier
+        if request.tier_id == "ultra":
+            if wallet.ultra_hours < deduction_amount:
+                raise HTTPException(status_code=402, detail="Insufficient Ultra Hours.")
+            wallet.ultra_hours -= deduction_amount
+        elif request.tier_id == "aaa":
+            if wallet.aaa_hours < deduction_amount:
+                raise HTTPException(status_code=402, detail="Insufficient AAA Hours.")
+            wallet.aaa_hours -= deduction_amount
+        else:
+            if wallet.esports_hours < deduction_amount:
+                raise HTTPException(status_code=402, detail="Insufficient Esports Hours.")
+            wallet.esports_hours -= deduction_amount
+            
+    node.status = models.HardwareStatus.IN_USE
+    node.current_user_id = current_user.id
+            
+    # Record the transaction
+    tx = models.Transaction(
+        user_id=current_user.id,
+        title=f"Compute Execution ({node.node_id})",
+        amount=0.0,
+        hours=-deduction_amount,
+        tier=request.tier_id
+    )
+    db.add(tx)
+    db.commit()
+    
+    token = secrets.token_urlsafe(32)
+    # Store token in Redis: key="nexus_token:<token>", value="{user_id}:{tier_id}:{deduction_amount}:{node_id}"
+    val = f"{current_user.id}:{request.tier_id}:{deduction_amount}:{node.node_id}"
+    redis_client.setex(f"nexus_token:{token}", 60, val)
+    
+    from api.celery_worker import check_ghost_lock
+    check_ghost_lock.apply_async(args=[node.node_id, token], countdown=65)
+    
+    return {"token": token, "status": "Ready for Ignition", "tailscale_ip": node.tailscale_ip}

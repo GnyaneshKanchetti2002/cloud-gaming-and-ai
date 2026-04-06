@@ -18,3 +18,6 @@ itsdangerous
 python-dotenv
 requests
 proxmoxer
+stripe
+pyotp
+aiofiles
