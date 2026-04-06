@@ -63,4 +63,4 @@ coverage.xml
 *.log
 
 # --- Native Clients ---
-/native-clients/
+# /native-clients/
